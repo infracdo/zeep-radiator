@@ -1,0 +1,10 @@
+00000000 Fri May 16 09:31:40 2025 201605: ERR: Could not connect to SQL database with DBI->connect dbi:Pg:dbname=radius;host=localhost;port=5432, radiator, **obscured**:  could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (::1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (127.0.0.1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 Fri May 16 09:31:40 2025 202221: ERR: Could not connect to any SQL database. Request is ignored. Backing off for 600 seconds
+00000000 Fri May 16 09:31:40 2025 447610: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Fri May 16 09:31:40 2025 448884: NOTICE: Server started: Radiator 4.23 on 73328c3ad3cc
+00000000 Fri May 16 09:33:13 2025 191841: NOTICE: SIGTERM received: stopping

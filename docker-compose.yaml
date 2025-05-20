@@ -1,0 +1,26 @@
+services:
+
+  radiator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: radiator
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    volumes:
+      - ./radiator.conf:/etc/radiator/radiator.conf:ro
+      - ./certs:/etc/radiator/certs:ro
+      - ./logs:/var/log/radiator  # Optional: persist logs on host
+    environment:
+      DB_HOST: 192.168.43.121
+      DB_PORT: 5432
+      DB_USER: radiator
+      DB_PASSWORD: ap0ll0ap0ll0
+      DB_NAME: radius
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped

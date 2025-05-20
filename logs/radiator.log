@@ -1,0 +1,56 @@
+00000000 Fri May 16 09:27:13 2025 897876: ERR: Could not connect to SQL database with DBI->connect dbi:Pg:dbname=radius;host=localhost;port=5432, radiator, **obscured**:  could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (::1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (127.0.0.1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 Fri May 16 09:27:13 2025 900719: ERR: Could not connect to any SQL database. Request is ignored. Backing off for 600 seconds
+00000000 Fri May 16 09:27:14 2025 135187: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Fri May 16 09:27:14 2025 136479: NOTICE: Server started: Radiator 4.23 on 7597eda389cc
+00000000 Fri May 16 09:31:17 2025 444825: NOTICE: SIGTERM received: stopping
+00000000 Fri May 16 09:34:38 2025 742931: ERR: Could not connect to SQL database with DBI->connect dbi:Pg:dbname=radius;host=localhost;port=5432, radiator, **obscured**:  could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (::1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (127.0.0.1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 Fri May 16 09:34:38 2025 743274: ERR: Could not connect to any SQL database. Request is ignored. Backing off for 600 seconds
+00000000 Fri May 16 09:34:38 2025 996340: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Fri May 16 09:34:38 2025 998364: NOTICE: Server started: Radiator 4.23 on 19b8b3fdcddd
+00000000 Fri May 16 09:39:06 2025 841704: ERR: Could not connect to SQL database with DBI->connect dbi:Pg:dbname=radius;host=localhost;port=5432, radiator, **obscured**:  could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (::1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (127.0.0.1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 Fri May 16 09:39:06 2025 842024: ERR: Could not connect to any SQL database. Request is ignored. Backing off for 600 seconds
+00000000 Fri May 16 09:39:07 2025 090240: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Fri May 16 09:39:07 2025 092235: NOTICE: Server started: Radiator 4.23 on 09b6ab2d787d
+00000000 Fri May 16 09:39:54 2025 101988: ERR: Could not connect to SQL database with DBI->connect dbi:Pg:dbname=radius;host=localhost;port=5432, radiator, **obscured**:  could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (::1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (127.0.0.1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 Fri May 16 09:39:54 2025 102305: ERR: Could not connect to any SQL database. Request is ignored. Backing off for 600 seconds
+00000000 Fri May 16 09:39:54 2025 358432: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Fri May 16 09:39:54 2025 360450: NOTICE: Server started: Radiator 4.23 on d19ae4456960
+00000000 Fri May 16 09:42:41 2025 793544: ERR: Could not connect to SQL database with DBI->connect dbi:Pg:dbname=radius;host=localhost;port=5432, radiator, **obscured**:  could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (::1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 could not connect to server: Connection refused
+00000000 	Is the server running on host "localhost" (127.0.0.1) and accepting
+00000000 	TCP/IP connections on port 5432?
+00000000 Fri May 16 09:42:41 2025 794287: ERR: Could not connect to any SQL database. Request is ignored. Backing off for 600 seconds
+00000000 Fri May 16 09:42:42 2025 035982: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Fri May 16 09:42:42 2025 037888: NOTICE: Server started: Radiator 4.23 on 5b8fec8338ed
+00000000 Fri May 16 09:51:45 2025 998928: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Fri May 16 09:51:46 2025 000964: NOTICE: Server started: Radiator 4.23 on c70d5437140b
+00000000 Fri May 16 09:54:31 2025 156512: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Fri May 16 09:54:31 2025 159312: NOTICE: Server started: Radiator 4.23 on e3dfc1f274a8
+00000000 Fri May 16 09:59:11 2025 487535: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Fri May 16 09:59:11 2025 489784: NOTICE: Server started: Radiator 4.23 on b658836fb66f
+00000000 Mon May 19 01:36:51 2025 506985: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Mon May 19 01:36:51 2025 509352: NOTICE: Server started: Radiator 4.23 on 2b392aa3c30a
+00000000 Mon May 19 01:45:43 2025 842036: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Mon May 19 01:45:43 2025 844073: NOTICE: Server started: Radiator 4.23 on 3a6edab491dd
