@@ -10,7 +10,7 @@ services:
       - "1813:1813/udp"
     volumes:
       - ./radiator.conf:/etc/radiator/radiator.conf:ro
-      - ./certs:/etc/radiator/certs:ro
+#      - ./certs:/etc/radiator/certs:ro
       - ./logs:/var/log/radiator  # Optional: persist logs on host
     environment:
       DB_HOST: 192.168.43.121

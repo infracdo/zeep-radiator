@@ -54,3 +54,16 @@
 00000000 Mon May 19 01:36:51 2025 509352: NOTICE: Server started: Radiator 4.23 on 2b392aa3c30a
 00000000 Mon May 19 01:45:43 2025 842036: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
 00000000 Mon May 19 01:45:43 2025 844073: NOTICE: Server started: Radiator 4.23 on 3a6edab491dd
+00000000 Tue May 20 01:22:44 2025 533931: WARNING: Attribute number 62 (vendor 4881) from 202.60.11.212 port 51407 is not defined in your dictionary. Enable ProxyUnknownAttributes if unknowns need to be proxied
+1e0bf000 Tue May 20 01:22:44 2025 541169: WARNING: Bad authenticator in request from DEFAULT (192.168.90.188)
+00000000 Tue May 20 01:24:50 2025 810758: WARNING: Attribute number 4 (vendor 4881) from 202.60.11.212 port 54621 is not defined in your dictionary. Enable ProxyUnknownAttributes if unknowns need to be proxied
+00000000 Tue May 20 01:24:51 2025 837047: ERR: Execute failed for 'select PASSWORD, SESSION_LIMIT from TEST where USERNAME='testuser'': SSL connection has been closed unexpectedly
+00000000 Tue May 20 01:24:52 2025 188394: WARNING: Attribute number 126 (vendor 4881) from 202.60.11.212 port 54621 is not defined in your dictionary. Enable ProxyUnknownAttributes if unknowns need to be proxied
+00000000 Tue May 20 01:25:13 2025 777839: WARNING: Attribute number 133 (vendor 4881) from 202.60.11.212 port 54621 is not defined in your dictionary. Enable ProxyUnknownAttributes if unknowns need to be proxied
+00000000 Tue May 20 01:25:13 2025 779401: WARNING: Attribute number 132 (vendor 4881) from 202.60.11.212 port 54621 is not defined in your dictionary. Enable ProxyUnknownAttributes if unknowns need to be proxied
+00000000 Tue May 20 01:25:13 2025 779931: WARNING: Attribute number 135 (vendor 4881) from 202.60.11.212 port 54621 is not defined in your dictionary. Enable ProxyUnknownAttributes if unknowns need to be proxied
+00000000 Tue May 20 01:25:13 2025 780463: WARNING: Attribute number 134 (vendor 4881) from 202.60.11.212 port 54621 is not defined in your dictionary. Enable ProxyUnknownAttributes if unknowns need to be proxied
+00000000 Tue May 20 01:25:13 2025 780966: WARNING: Attribute number 137 (vendor 4881) from 202.60.11.212 port 54621 is not defined in your dictionary. Enable ProxyUnknownAttributes if unknowns need to be proxied
+00000000 Tue May 20 01:25:13 2025 781517: WARNING: Attribute number 136 (vendor 4881) from 202.60.11.212 port 54621 is not defined in your dictionary. Enable ProxyUnknownAttributes if unknowns need to be proxied
+00000000 Wed Jun  4 07:08:57 2025 800608: INFO: Using Net::SSLeay 1.88 with SSL/TLS library version 0x1010106f (OpenSSL 1.1.1f  31 Mar 2020)
+00000000 Wed Jun  4 07:08:57 2025 805665: NOTICE: Server started: Radiator 4.23 on b53456f0f1b9
