@@ -17,7 +17,7 @@ sub {
     return unless $username && $csid;
 
     eval {
-        my $dbh = DBI->connect("dbi:Pg:dbname=radius;host=202.60.8.113", "radiator", "z33P@R@d!@T0r", { RaiseError => 1, AutoCommit => 1 });
+        my $dbh = DBI->connect("dbi:Pg:dbname=radius;host=192.168.61.22;port=5433", "radiator", "z33P@R@d!@T0r", { RaiseError => 1, AutoCommit => 1 });
         my $sth = $dbh->prepare(q{
             INSERT INTO nas_session_mac_attrs (username, called_station_id, updated_at)
             VALUES (?, ?, NOW())
