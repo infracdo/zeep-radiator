@@ -25,6 +25,7 @@ COPY radiator.conf /etc/radiator/
 COPY certs/ /etc/radiator/certs/
 COPY dictionary /opt/radiator/radiator/
 COPY session_hook.pl /etc/radiator/
+COPY .env /etc/radiator
 
 RUN chmod 644 /etc/radiator/session_hook.pl \
  && mkdir -p /var/log/radiator \
