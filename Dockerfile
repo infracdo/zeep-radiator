@@ -26,6 +26,10 @@ COPY certs/ /etc/radiator/certs/
 COPY dictionary /opt/radiator/radiator/
 COPY session_hook.pl /etc/radiator/
 
+RUN chmod 644 /etc/radiator/session_hook.pl \
+ && mkdir -p /var/log/radiator \
+ && chmod 777 /var/log/radiator
+
 # Expose RADIUS port (default is 1812/UDP for auth, 1813/UDP for accounting)
 EXPOSE 1812/udp 1813/udp
 
