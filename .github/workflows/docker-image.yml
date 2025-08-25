@@ -25,10 +25,10 @@ jobs:
       # Step 3: Build the Docker image
       - name: Build Docker Image
         run: 
-          docker build -t zeep-radiator:sbx .
+          docker build -t zeep-radiator:prod .
 
       # Step 4: Push the Docker image
       - name: Push Docker Image
         run: |
-          docker tag zeep-radiator:sbx infracdo/zeep-radiator:sbx
-          docker push infracdo/zeep-radiator:sbx
+          docker tag zeep-radiator:prod infracdo/zeep-radiator:prod
+          docker push infracdo/zeep-radiator:prod
