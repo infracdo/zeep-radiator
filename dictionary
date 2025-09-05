@@ -17,10 +17,6 @@
 # END OF HEADER
 # $Id$
 
-VENDOR		Ruijie	4881
-VENDORATTR	4881	flux-max-high32        18      integer
-VENDORATTR	4881	flux-max-low32         19      integer
-
 # SYNONYMS
 # There are a number of commonly used names for some attributes.
 # in the interests of maximising portability, Radiator supports
@@ -851,6 +847,26 @@ VALUE           Error-Cause  Resources-Unavailable              506
 VALUE           Error-Cause  Request-Initiated                  507
 VALUE           Error-Cause  Multiple-Session-Selection-Unsupported 508
 VALUE           Error-Cause  Location-Info-Required             509
+
+#
+# Vendor-specific attributes for RUIJIE
+#
+VENDOR		Ruijie	4881
+VENDORATTR	4881	max-down-rate          1       string
+VENDORATTR	4881	port-priority          2       string
+VENDORATTR	4881	user-ip                3       string
+VENDORATTR	4881	vlan-id                4       string
+VENDORATTR	4881	net-ip                 6       string
+VENDORATTR	4881	max-up-rate            16      string
+VENDORATTR	4881	flux-max-high32        18      integer
+VENDORATTR	4881	flux-max-low32         19      integer
+VENDORATTR	4881	access-user-type       62      string
+VENDORATTR	4881	wlan-id                118     string
+VENDORATTR	4881	terminate-cause        125     string
+VENDORATTR	4881	ipv6-output-packets    133     integer
+VENDORATTR	4881	ipv6-input-packets     132     integer
+VENDORATTR	4881	ipv6-output-octets     135     integer
+VENDORATTR	4881	ipv6-input-octets      134     integer
 
 #
 # Vendor-specific attributes for ACC
