@@ -15,7 +15,9 @@ sub {
 #    close($log);
 
     return unless $username && $csid;
-
+	
+    return unless $r->code == RADIUS::ACCEPT;
+	
     eval {
         my $dbh = DBI->connect("dbi:Pg:dbname=radius;host=192.168.61.37;port=5433", "radiator", "z33PRad!aT0r", { RaiseError => 1, AutoCommit => 1 });
         my $sth = $dbh->prepare(q{
