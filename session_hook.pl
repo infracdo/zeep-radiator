@@ -4,15 +4,13 @@ sub {
     my $csid_raw = $p->get_attr('Called-Station-Id');
     my ($csid) = $csid_raw =~ /^([0-9a-fA-F]{12})/;
 
+    if ($csid_clean) {
+        $p->add_attr('Clean-Called-Station-Id', $csid_clean);
+    }
+
     open(my $log, '>>', '/var/log/radiator/session_debug.log');
     print $log scalar(localtime) . " - 👤 $username 📡 $csid_raw (parsed: $csid)\n";
     close($log);
-
-#    my $csid = $p->get_attr('Called-Station-Id');
-
-#    open(my $log, '>>', '/var/log/radiator/session_debug.log');
-#    print $log scalar(localtime) . " - 👤 $username 📡 $csid\n";
-#    close($log);
 
     return unless $username && $csid;
 
