@@ -3,9 +3,9 @@ sub {
     my $username = $p->get_attr('User-Name');
     my $csid_raw = $p->get_attr('Called-Station-Id');
     my ($csid) = $csid_raw =~ /^([0-9a-fA-F]{12})/;
-    if ($csid_clean) {
+    if ($csid) {
         # Add a new attribute 'Clean-Called-Station-Id' with the cleaned value
-        $p->add_attr('Clean-Called-Station-Id', $csid_clean);
+        $p->add_attr('Clean-Called-Station-Id', $csid);
         print $log scalar(localtime) . " - 📡 cleaned mac address " . $p->get_attr('Clean-Called-Station-Id') . "\n";
     }
 
