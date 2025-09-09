@@ -3,16 +3,6 @@ sub {
     my $username = $p->get_attr('User-Name');
     my $csid_raw = $p->get_attr('Called-Station-Id');
     my ($csid) = $csid_raw =~ /^([0-9a-fA-F]{12})/;
-    return unless $username && $csid;
-
-    $p->add_attr('Clean-Called-Station-Id', $csid);
-    my $csid_clean = $p->get_attr('Clean-Called-Station-Id');
-    return unless $csid_clean;
-
-    open(my $log, '>>', '/var/log/radiator/session_debug.log');
-    print $log scalar(localtime) . " - 👤 $username 📡 $csid_raw (parsed: $csid) $csid_clean\n";
-    close($log);
-
 
     eval {
         my $dbh = DBI->connect("dbi:Pg:dbname=radius;host=192.168.61.37;port=5433", "radiator", "z33PRad!aT0r", { RaiseError => 1, AutoCommit => 1 });
@@ -27,12 +17,12 @@ sub {
         $dbh->disconnect;
 
         open(my $log2, '>>', '/var/log/radiator/session_debug.log');
-        print $log2 scalar(localtime) . " - ✅ INSERT OK for $username\n";
+        print $log2 scalar(localtime) . " - Added $username and $csid to nas_session_mac_attrs\n";
         close($log2);
     };
     if ($@) {
         open(my $errlog, '>>', '/var/log/radiator/session_debug.log');
-        print $errlog scalar(localtime) . " - ❌ DB ERROR: $@\n";
+        print $errlog scalar(localtime) . " - POST-SESSION HOOK ENCOUNTERED DB ERROR: $@\n";
         close($errlog);
     }
 
