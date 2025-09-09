@@ -4,14 +4,16 @@ sub {
     open(my $log, '>>', '/var/log/radiator/all_attributes.log');
     print $log scalar(localtime) . " - Logging all attributes for request:\n";
 
+    my @attrs = $p->get_all_attributes();
+
     my $i = 0;
-    while (defined(my $attr = $p->get_attr($i))) {
+    for my $attr (@attrs) {
         print $log "  [$i] $attr\n";
         $i++;
     }
 
     close($log);
-    
+
     my $username = $p->get_attr('User-Name');
     my $csid_raw = $p->get_attr('Called-Station-Id');
     my ($csid) = $csid_raw =~ /^([0-9a-fA-F]{12})/;
