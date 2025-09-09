@@ -22,7 +22,7 @@ sub {
         return $main::REJECT_IMMEDIATE;
     }
     
-    $p->add_attr('Clean-Csid', $csid);
+    $p->add_attr('Clean-CSID', $csid);
 
     open(my $log, '>>', '/var/log/radiator/session_debug.log');
     print $log scalar(localtime) . " - Processing $username (raw csid: $csid_raw) (cleaned csid: $csid)\n";
