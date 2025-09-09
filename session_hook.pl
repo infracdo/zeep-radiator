@@ -1,5 +1,5 @@
 sub {
-    my $p = ${$_[0]};
+    my ($p, $r) = @_;
     my $username = $p->get_attr('User-Name');
     my $csid_raw = $p->get_attr('Called-Station-Id');
     my ($csid) = $csid_raw =~ /^([0-9a-fA-F]{12})/;
