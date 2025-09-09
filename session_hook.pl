@@ -6,7 +6,6 @@ sub {
     if ($csid) {
         # Add a new attribute 'Clean-Called-Station-Id' with the cleaned value
         $p->add_attr('Clean-Called-Station-Id', $csid);
-        print $log scalar(localtime) . " - 📡 cleaned mac address " . $p->get_attr('Clean-Called-Station-Id') . "\n";
     }
 
     open(my $log, '>>', '/var/log/radiator/session_debug.log');
