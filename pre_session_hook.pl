@@ -43,5 +43,5 @@ sub {
         return $main::REJECT_IMMEDIATE;
     }
 
-    return $main::ACCEPT;
+    return;
 }
