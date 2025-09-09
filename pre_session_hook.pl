@@ -15,7 +15,7 @@ sub {
     close($log);
 
     eval {
-        my $dbh = DBI->connect("dbi:Pg:dbname=radius;host=192.168.61.37;port=5433", "radiator", "z33PRad!aT0r", { RaiseError => 1, AutoCommit => 1 });
+        my $dbh = DBI->connect("dbi:Pg:dbname=radius;host=192.168.61.22;port=5433", "radiator", "ap0ll0z33P", { RaiseError => 1, AutoCommit => 1 });
         my $check_sth = $dbh->prepare(q{
             SELECT 1 FROM allowed_nas_mac_address WHERE called_station_id = ?
         });
