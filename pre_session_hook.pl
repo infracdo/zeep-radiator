@@ -1,17 +1,16 @@
 sub {
     my $p = ${$_[0]};
 
-    open(my $log, '>>', '/var/log/radiator/all_attributes.log');
-    print $log scalar(localtime) . " - Logging all attributes for request:\n";
+    # open(my $log, '>>', '/var/log/radiator/all_attributes.log');
+    # print $log scalar(localtime) . " - Logging all attributes for request:\n";
 
-    foreach my $attr_name ($p->get_attr_names) {
-        my @values = $p->get_attr($attr_name);
-        foreach my $val (@values) {
-            print $log "  $attr_name = $val\n";
-        }
-    }
+    # foreach my $attr_obj ($p->attributes) {
+    #     my $name  = $attr_obj->name;
+    #     my $value = $attr_obj->value;
+    #     print $log "  $name = $value\n";
+    # }
 
-    close($log);
+    # close($log);
     
     my $username = $p->get_attr('User-Name');
     my $csid_raw = $p->get_attr('Called-Station-Id');
