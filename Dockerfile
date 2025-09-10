@@ -39,5 +39,6 @@ EXPOSE 1812/udp 1813/udp
 # Start Radiator in foreground with logging
 #CMD ["/opt/radiator/radiator/radiusd", "-config_file", "/etc/radiator/radiator.conf", "-foreground", "-log_stdout"]
 #CMD ["/opt/radiator/radiator/radiusd", "-config_file", "/etc/radiator/radiator.conf", "-foreground", "-log_stdout", "-log_dir", "/var/log/radiator"]
-CMD ["/bin/bash", "-c", "/opt/radiator/radiator/radiusd -config_file /etc/radiator/radiator.conf & tail -F /var/log/radiator/radiator.log"]
+#CMD ["/bin/bash", "-c", "/opt/radiator/radiator/radiusd -config_file /etc/radiator/radiator.conf & tail -F /var/log/radiator/radiator.log"]
+CMD ["/bin/bash", "-c", "/opt/radiator/radiator/radiusd -config_file /etc/radiator/radiator.conf & tail -F /var/log/radiator/radiator.log /var/log/radiator/session_debug.log"]
 
