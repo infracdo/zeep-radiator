@@ -7,11 +7,11 @@ sub {
     my ($csid) = $csid_raw =~ /^([0-9a-fA-F]{12})/;
     unless ($username && $csid) { # checks if username and csid are defined and not empty
         open(my $rejlog, '>>', '/var/log/radiator/session_debug.log');
-        print $rejlog scalar(localtime) . " - Username and/or CSID incomplete - rejecting $username\n";
+        print $rejlog scalar(localtime) . " - username and/or csid cannot be identified - rejecting $username\n";
         close($rejlog);
                 
         $rp->set_code('Access-Reject');
-        $rp->add_attr('Reply-Message', 'Access rejected because username and/or csid is not found.');
+        $rp->add_attr('Reply-Message', 'Access denied due to unidentified username/csid.');
         $p->{Client}->replyTo($p);
 
         return;
@@ -20,7 +20,7 @@ sub {
     if ($code eq 'Access-Request') {
 
         open(my $log, '>>', '/var/log/radiator/session_debug.log');
-        print $log scalar(localtime) . " - Processing $username (raw csid: $csid_raw) (cleaned csid: $csid)\n";
+        print $log scalar(localtime) . " - user $username attempting to authenticate from csid $csid_raw)\n";
         close($log);
         
         eval {
@@ -35,18 +35,18 @@ sub {
 
             unless ($is_allowed) { # checks if csid is in allowed_nas_mac_address
                 open(my $rejlog, '>>', '/var/log/radiator/session_debug.log');
-                print $rejlog scalar(localtime) . " - CSID $csid not in allowed_nas_mac_address - rejecting $username\n";
+                print $rejlog scalar(localtime) . " - csid $csid not in list of allowed nas mac address - rejecting $username\n";
                 close($rejlog);
                 
                 $rp->set_code('Access-Reject');
-                $rp->add_attr('Reply-Message', 'Access rejected because csid is not allowed.');
+                $rp->add_attr('Reply-Message', 'Access denied due to unauthorized csid.');
                 $p->{Client}->replyTo($p);
 
                 return;
             }
 
             open(my $log2, '>>', '/var/log/radiator/session_debug.log');
-            print $log2 scalar(localtime) . " - Found CSID $csid in allowed_nas_mac_address - accepting $username\n";
+            print $log2 scalar(localtime) . " - found csid $csid in list of allowed nas mac address - accepting $username\n";
             close($log2);
         };
         if ($@) {# if error is found during DB operations, log it and reject
@@ -55,7 +55,7 @@ sub {
             close($errlog);
                 
             $rp->set_code('Access-Reject');
-            $rp->add_attr('Reply-Message', 'Access rejected because an error occurred during authentication.');
+            $rp->add_attr('Reply-Message', 'Access denied due to a database error during authentication.');
             $p->{Client}->replyTo($p);
 
             return;
