@@ -42,6 +42,10 @@ sub {
                 $remaining_bytes = 0 unless defined $remaining_bytes;
                 $check_sth->finish;
                 $dbh->disconnect;
+
+                open(my $log2, '>>', '/var/log/radiator/session_debug.log');
+                print $log2 scalar(localtime) . " - remaining bytes for $username: $remaining_bytes (CSID: $csid)\n";
+                close($log2);
                 
                 if ($remaining_bytes <= 0)
                 {
