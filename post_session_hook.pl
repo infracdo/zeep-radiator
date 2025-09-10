@@ -30,7 +30,7 @@ sub {
 
                 $dbh = DBI->connect("dbi:Pg:dbname=radius;host=192.168.61.22;port=5433", "radiator", "ap0ll0z33P", { RaiseError => 1, AutoCommit => 1 });
                 $sth = $dbh->prepare(q{
-                    SELECT remaining_bytes FROM subscriber WHERE username = ?
+                    SELECT remaining_bytes FROM subscribers WHERE username = ?
                 });
                 $sth->execute($username);
                 $remaining_bytes = $sth->fetchrow_array;
