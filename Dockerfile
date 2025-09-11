@@ -24,10 +24,12 @@ RUN mkdir -p /etc/radiator
 COPY radiator.conf /etc/radiator/
 COPY certs/ /etc/radiator/certs/
 COPY dictionary /opt/radiator/radiator/
-COPY session_hook.pl /etc/radiator/
+COPY pre_session_hook.pl /etc/radiator/
+COPY post_session_hook.pl /etc/radiator/
 COPY .env /etc/radiator
 
-RUN chmod 644 /etc/radiator/session_hook.pl \
+RUN chmod 644 /etc/radiator/pre_session_hook.pl \
+ && chmod 644 /etc/radiator/post_session_hook.pl \
  && mkdir -p /var/log/radiator \
  && chmod 777 /var/log/radiator
 
@@ -37,5 +39,6 @@ EXPOSE 1812/udp 1813/udp
 # Start Radiator in foreground with logging
 #CMD ["/opt/radiator/radiator/radiusd", "-config_file", "/etc/radiator/radiator.conf", "-foreground", "-log_stdout"]
 #CMD ["/opt/radiator/radiator/radiusd", "-config_file", "/etc/radiator/radiator.conf", "-foreground", "-log_stdout", "-log_dir", "/var/log/radiator"]
-CMD ["/bin/bash", "-c", "/opt/radiator/radiator/radiusd -config_file /etc/radiator/radiator.conf & tail -F /var/log/radiator/radiator.log"]
+#CMD ["/bin/bash", "-c", "/opt/radiator/radiator/radiusd -config_file /etc/radiator/radiator.conf & tail -F /var/log/radiator/radiator.log"]
+CMD ["/bin/bash", "-c", "/opt/radiator/radiator/radiusd -config_file /etc/radiator/radiator.conf & tail -F /var/log/radiator/radiator.log /var/log/radiator/session_debug.log"]
 
