@@ -1,4 +1,5 @@
 sub {
+    &main::log($main::LOG_DEBUG, "handler access-request has been called");
     my $p = ${$_[0]};
     my $rp = ${$_[1]};
     my $code   = $p->code;
@@ -16,50 +17,46 @@ sub {
 
         return;
     }
+    my ($dbh, $sth);
 
-    if ($code eq 'Access-Request') {
-
+    eval {
         open(my $log, '>>', '/var/log/radiator/session_debug.log');
         print $log scalar(localtime) . " - user $username attempting to authenticate from csid $csid_raw)\n";
         close($log);
         
-        eval {
-            my $dbh = DBI->connect("dbi:Pg:dbname=radius;host=192.168.61.22;port=5433", "radiator", "ap0ll0z33P", { RaiseError => 1, AutoCommit => 1 });
-            my $check_sth = $dbh->prepare(q{
-                SELECT 1 FROM allowed_nas_mac_address WHERE called_station_id = ?
-            });
-            $check_sth->execute($csid);
-            my $is_allowed = $check_sth->fetchrow_array;
-            $check_sth->finish;
-            $dbh->disconnect;
+        $dbh = DBI->connect("dbi:Pg:dbname=radius;host=192.168.61.22;port=5433", "radiator", "ap0ll0z33P", { RaiseError => 1, AutoCommit => 1 });
+        $sth = $dbh->prepare(q{
+            SELECT 1 FROM allowed_nas_mac_address WHERE called_station_id = ?
+        });
+        $sth->execute($csid);
+        my $is_allowed = $sth->fetchrow_array;
+        $sth->finish;
+        $dbh->disconnect;
 
-            unless ($is_allowed) { # checks if csid is in allowed_nas_mac_address
-                open(my $rejlog, '>>', '/var/log/radiator/session_debug.log');
-                print $rejlog scalar(localtime) . " - csid $csid not in list of allowed nas mac address - rejecting $username\n";
-                close($rejlog);
-                
-                $rp->set_code('Access-Reject');
-                $rp->add_attr('Reply-Message', 'Access denied due to unauthorized csid.');
-                $p->{Client}->replyTo($p);
-
-                return;
-            }
-
-            open(my $log2, '>>', '/var/log/radiator/session_debug.log');
-            print $log2 scalar(localtime) . " - found csid $csid in list of allowed nas mac address - accepting $username\n";
-            close($log2);
-        };
-        if ($@) {# if error is found during DB operations, log it and reject
-            open(my $errlog, '>>', '/var/log/radiator/session_debug.log');
-            print $errlog scalar(localtime) . " - PRE-SESSION HOOK ENCOUNTERED DB ERROR: $@\n";
-            close($errlog);
-                
+        unless ($is_allowed) { # checks if csid is in allowed_nas_mac_address
+            open(my $rejlog, '>>', '/var/log/radiator/session_debug.log');
+            print $rejlog scalar(localtime) . " - csid $csid not in list of allowed nas mac address - rejecting $username\n";
+            close($rejlog);
+            
             $rp->set_code('Access-Reject');
-            $rp->add_attr('Reply-Message', 'Access denied due to a database error during authentication.');
+            $rp->add_attr('Reply-Message', 'Access denied due to unauthorized csid.');
             $p->{Client}->replyTo($p);
 
             return;
         }
+
+        open(my $log2, '>>', '/var/log/radiator/session_debug.log');
+        print $log2 scalar(localtime) . " - found csid $csid in list of allowed nas mac address - accepting $username\n";
+        close($log2);
+    };
+    if ($@) {# if error is found during DB operations, log it and reject
+        open(my $errlog, '>>', '/var/log/radiator/session_debug.log');
+        print $errlog scalar(localtime) . " - PRE-SESSION HOOK ENCOUNTERED DB ERROR: $@\n";
+        close($errlog);
+            
+        $rp->set_code('Access-Reject');
+        $rp->add_attr('Reply-Message', 'Access denied due to a database error during authentication.');
+        $p->{Client}->replyTo($p);
     }
 
     return;
