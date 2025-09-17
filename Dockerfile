@@ -26,6 +26,7 @@ COPY certs/ /etc/radiator/certs/
 COPY dictionary /opt/radiator/radiator/
 COPY pre_session_hook.pl /etc/radiator/
 COPY post_session_hook.pl /etc/radiator/
+COPY AuthZeep.pm /opt/radiator/radiator/radius/
 COPY .env /etc/radiator
 
 RUN chmod 644 /etc/radiator/pre_session_hook.pl \
