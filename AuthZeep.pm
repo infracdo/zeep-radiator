@@ -111,7 +111,7 @@ sub initialize
 sub is_not_allowed_nas # rejects user if nas is not allowed
 {
     my ($self, $p) = @_;
-    my $called_station_id = $p->get_attr('Called-Station-Id');
+    my ($called_station_id) = split /:/, $p->getAttrByNum($Radius::Radius::CALLED_STATION_ID);
     return 1 unless $called_station_id; # if csid not found, reject user
     my $qcalled_station_id = $self->quote($called_station_id); # store quoted called_station_id to variable for use later in function
     my $q = &Radius::Util::format_special($self->{NasSelect}, $p, $self, $qcalled_station_id);
