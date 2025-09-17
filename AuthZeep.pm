@@ -148,10 +148,8 @@ sub is_user_limits_reached # rejects user if limit reached
     
     if ($limittype eq 1 ) 
     {
-		$self->log($main::LOG_DEBUG, "[ZEEP] user $qusername_nq ran out of time $timeleft ", $p);
         return 1 if ($timeleft <= 0 );
     } elsif ($limittype eq 2 ) {
-		$self->log($main::LOG_DEBUG, "[ZEEP] user $qusername_nq ran out of data $dataleft ", $p);
         return 1 if ($dataleft <= 0 );
     }
 
@@ -206,7 +204,7 @@ sub handle_request
 
 		return ($main::REJECT_IMMEDIATE, 'CSID is not allowed')
 			if  $self->is_not_allowed_nas($p);
-			
+
 		$self->log($main::LOG_DEBUG, "[ZEEP] user passed nas check", $p);
 
 		return ($main::REJECT_IMMEDIATE, 'User limits reached')
@@ -214,7 +212,9 @@ sub handle_request
 
 		$self->log($main::LOG_DEBUG, "[ZEEP] user passed nas and limits check", $p);
 		# The default behaviour in AuthGeneric is fine for this
-		return $self->SUPER::handle_request($p, $p->{rp}, $extra_checks);
+		my ($result, $reason) = $self->SUPER::handle_request($p, $p->{rp}, $extra_checks);
+		$self->log($main::LOG_DEBUG, "[ZEEP] SUPER handle result: $result, reason: $reason", $p);
+		return ($result, $reason);
     }
     elsif ($p->code eq 'Accounting-Request')
     {
