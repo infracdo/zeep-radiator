@@ -206,10 +206,13 @@ sub handle_request
 
 		return ($main::REJECT_IMMEDIATE, 'CSID is not allowed')
 			if  $self->is_not_allowed_nas($p);
+			
+		$self->log($main::LOG_DEBUG, "[ZEEP] user passed nas check", $p);
 
 		return ($main::REJECT_IMMEDIATE, 'User limits reached')
 			if  $self->is_user_limits_reached($p);
 
+		$self->log($main::LOG_DEBUG, "[ZEEP] user passed nas and limits check", $p);
 		# The default behaviour in AuthGeneric is fine for this
 		return $self->SUPER::handle_request($p, $p->{rp}, $extra_checks);
     }
