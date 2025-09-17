@@ -140,7 +140,7 @@ sub is_user_limits_reached # rejects user if limit reached
     return 1 unless $sth; # if not found, reject user
 	my @row = $self->getOneRow($sth); # session_limit, remaining_session_time, bytes_limit, remaining_bytes
 	$sth->finish();
-    my $dataleft = $row[1];
+    my $dataleft = $row[3];
     $self->log($main::LOG_DEBUG, "[ZEEP] user $qusername_nq remaining data left: $dataleft ", $p);
 
     my $limittype = 2; # 1 if time based, 2 if data based // TODO REVISIT: replace static with dynamic value from DB
@@ -148,8 +148,10 @@ sub is_user_limits_reached # rejects user if limit reached
     
     if ($limittype eq 1 ) 
     {
+		$self->log($main::LOG_DEBUG, "[ZEEP] user $qusername_nq ran out of time $timeleft ", $p);
         return 1 if ($timeleft <= 0 );
     } elsif ($limittype eq 2 ) {
+		$self->log($main::LOG_DEBUG, "[ZEEP] user $qusername_nq ran out of data $dataleft ", $p);
         return 1 if ($dataleft <= 0 );
     }
 
