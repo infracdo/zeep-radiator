@@ -110,10 +110,10 @@ sub initialize
 # This function is called during every access request
 sub is_not_allowed_nas # rejects user if nas is not allowed
 {
+    my ($self, $p) = @_;
     my $username_nq = $self->{CurrentUser}; # get current user
 	return 0 if ( $username_nq eq 'anonymous'); # allow anonymous users during peap 1
     return 1 if (!defined($username_nq) || $username_nq eq ''); # reject empty users
-    my ($self, $p) = @_;
     my ($called_station_id) = split /:/, $p->getAttrByNum($Radius::Radius::CALLED_STATION_ID);
     return 1 unless $called_station_id; # if csid not found, reject user
     my $qcalled_station_id = $self->quote($called_station_id); # get quoted called_station_id
