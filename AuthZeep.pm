@@ -136,7 +136,6 @@ sub is_user_limits_reached # rejects user if limit reached
     my ($self, $p) = @_;
     my $username_nq = $p->getUserName(); # get unquoted current user name
     $self->{CurrentUser} = $username_nq; # store current user for later use
-    return 0 if ( $username_nq eq 'anonymous'); # allow anonymous users during peap 1
     return 1 if (!defined($username_nq) || $username_nq eq ''); # reject empty users
     my $qusername = $self->quote($username_nq); # get quoted user name 
     my $q = &Radius::Util::format_special($self->{QueryDataLimits}, $p, $self, $qusername); # sanitize query values
@@ -187,8 +186,8 @@ sub update_remaining_quota # TODO; UPDATE USER QUOTA IN SUBSCRIBERS TABLE
 	{
 		my $colvalstring = "remaining_bytes=remaining_bytes - ($totalincreasedbytes)"; # update user's remaining bytes
 		my $q = &Radius::Util::format_special($self->{AcctUpdateQuery}, $p, $self, 'subscribers', $colvalstring, 'username', $quser_name);
+		$self->log($main::LOG_DEBUG, "update quota query $q", $p);
 		$self->do($q); # execute sql query
-		$self->log($main::LOG_DEBUG, "updated user quota for $quser_name in subscribers table", $p);
 	}
 }
 
@@ -197,16 +196,17 @@ sub update_remaining_quota # TODO; UPDATE USER QUOTA IN SUBSCRIBERS TABLE
 # This function is called during every alive/stop accounting request
 sub update_ap_usage # TODO; UPDATE AP USAGE IN AP_ACCOUNTING TABLE
 {
-    my ($self, $p, $quser_name, $increasedinput, $increasedoutput, $increasedtime) = @_;
+    my ($self, $p, $increasedinput, $increasedoutput, $increasedtime) = @_;
 	my ($ap_mac) = split /:/, $p->getAttrByNum($Radius::Radius::CALLED_STATION_ID);
 	my $qap_mac = $self->quote($ap_mac);
 	if ($increasedinput > 0 || $increasedoutput > 0 || $increasedtime > 0) # only update if there is an increase
 	{
 		my $colvalstring = "totalinputoctets=totalinputoctets + ($increasedinput), totaloutputoctets=totaloutputoctets + ($increasedoutput), totalsessiontime=totalsessiontime + ($increasedtime), last_updated=now()"; # update user's remaining bytes
 		my $q = &Radius::Util::format_special($self->{AcctUpdateQuery}, $p, $self, 'ap_accounting', $colvalstring, 'called_station_id', $qap_mac);
+		$self->log($main::LOG_DEBUG, "update usage query $q", $p);
 		$self->do($q); # execute sql query
-		$self->log($main::LOG_DEBUG, "updated ap usage for $qap_mac in ap accounting table", $p);
 	}
+	return;
 }
 
 #####################################################################
@@ -240,11 +240,20 @@ sub handle_request
 		return ($main::REJECT, 'Authentication disabled')
 			if $self->{AuthSelect} eq '';
 
-		return ($main::REJECT, 'User limits reached')
-			if  $self->is_user_limits_reached($p);
+		if ($p->{"EAP-Message"}) {
+			my $username = $p->getUserName();
+			if (defined $username && $username ne '' && $username ne 'anonymous') {
+				return ($main::REJECT, 'CSID is not allowed')
+					if  $self->is_not_allowed_nas($p);
 
-		return ($main::REJECT, 'CSID is not allowed')
-			if  $self->is_not_allowed_nas($p);
+				return ($main::REJECT, 'User limits reached')
+					if  $self->is_user_limits_reached($p);
+
+				$self->log($main::LOG_DEBUG, "[ZEEP] user passed nas and limits check", $p);
+			} else {
+				$self->log($main::LOG_DEBUG, "[ZEEP] Skipping CSID/limit checks during PEAP Phase 1 for user $username", $p);
+			}
+		}
 
 		# The default behaviour in AuthGeneric is fine for this
 		return $self->SUPER::handle_request($p, $p->{rp}, $extra_checks);
@@ -433,8 +442,8 @@ sub handle_accounting
 		elsif ($status_type eq 'Alive' || $status_type eq 'Stop') 
 		{ 
 			# RETRIEVE CURRENT VALUES FROM ACCOUNTING TABLE
-			my @current_values = $self->get_current_values($q, $qacctsessionid);
-
+			my @current_values = $self->get_current_values($p, $qacctsessionid);
+			
 			# UPDATE IF VALUES WERE RETRIEVED
 			if (@current_values)
 			{
@@ -452,10 +461,10 @@ sub handle_accounting
 				$increasedtime   = 0 if $increasedtime   < 0;
 
 				# UPDATE USER REMAINING QUOTA
-				update_remaining_quota($q, $quser_name, $increasedinput, $increasedoutput);
+				$self->update_remaining_quota($p, $quser_name, $increasedinput, $increasedoutput);
 
 				# UPDATE AP TOTAL BANDWIDTH AND SESSION TIME 
-				update_ap_usage($q, $quser_name, $increasedinput, $increasedoutput, $increasedtime);
+				$self->update_ap_usage($p, $increasedinput, $increasedoutput, $increasedtime);
 			} 
 
 			# UPDATE ACCOUNTING ENTRY
