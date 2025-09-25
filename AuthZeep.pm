@@ -51,6 +51,11 @@ use strict;
  ['string', 'This optional parameter defines an SQL query which will be used to create and save an EAP-FAST PAC to the database', 1],
  'GetEAPFastPACQuery'         => 
  ['string', 'This optional parameter defines an SQL query which will be used to retrieve an EAP-FAST PAC from the database', 1],
+ 
+ 'RedisHost'         => 
+ ['string', 'Redis Database host', 1],
+ 'RedisPassword'         => 
+ ['string', 'Redis Database password', 1],
  );
 
 # RCS version number of this module
@@ -65,6 +70,13 @@ sub check_config
 
     $self->Radius::AuthGeneric::check_config();
     $self->Radius::SqlDb::check_config();
+	
+	$self->log($main::LOG_WARNING, "No RedisHost defined")
+      unless $self->{RedisHost};
+
+    $self->log($main::LOG_WARNING, "No RedisPassword defined")
+      unless $self->{RedisPassword};
+
     return;
 }
 
@@ -75,6 +87,7 @@ sub activate
 
     $self->Radius::AuthGeneric::activate;
     $self->Radius::SqlDb::activate;
+	try_reconnect_redis(undef, $self);
 
     return;
 }
@@ -102,7 +115,51 @@ sub initialize
     $self->{NullPasswordMatchesAny} = 1;
     $self->{CurrentUser} = undef;
 
+    $self->{FailureBackoffTime} = 10;
+    $self->{redis_connected} = 0;
+    $self->{reconnect_in_progress} = 0;
+    $self->{DbIndex} = 0;
+    $self->{redis} = undef;
+
     return;
+}
+
+sub try_reconnect_redis {
+    my ($handle, $self) = @_;
+
+    $self->connect_redis() unless $self->{redis_connected}; # if not connected, attempt to connect
+
+	if ($self->{redis_connected}) {
+        $self->log($main::LOG_INFO, "[ZEEP] $self->{log_class_identifier}: Successfully connected to Redis");
+    }
+	else
+    {
+		if ($self->{FailureBackoffTime})
+		{
+			# Schedule a reconnect attempt
+			$self->log($main::LOG_INFO, "[ZEEP] $self->{log_class_identifier}: Will try to reconnect to Redis in $self->{FailureBackoffTime} second(s)");
+			Radius::Select::add_timeout(time + $self->{FailureBackoffTime}, \&try_reconnect_redis, $self);
+			$self->{reconnect_in_progress} = 1;
+		}
+    }
+
+    return;
+}
+
+sub connect_redis {
+    my ($self) = @_;
+	eval {
+		my $r = Redis->new(server => $self->{RedisHost} . ":6379");
+		$r->auth( $self->{RedisPassword});  
+		$r->select($self->{DbIndex});
+		$self->{redis} = $r;
+		$self->{redis_connected} = 1;
+		$self->{reconnect_in_progress} = 0;
+	};
+	if ($@) {
+        $self->log($main::LOG_ERR, "[Redis] Redis connection failed: $@");
+        $self->{redis_connected} = 0;
+    }
 }
 
 #####################################################################
