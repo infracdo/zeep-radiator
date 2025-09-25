@@ -8,6 +8,7 @@ sub {
     my ($csid, $ssid) = split /:/, $csid_raw;
     &main::log($main::LOG_DEBUG, "user $username from csid $csid has received result code $result");
 
+
     my ($dbh, $sth);
 
     eval {
