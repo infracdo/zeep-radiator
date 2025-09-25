@@ -110,19 +110,25 @@ sub initialize
 # This function is called during every access request
 sub is_not_allowed_nas # rejects user if nas is not allowed
 {
-    my ($self, $p) = @_;
-    my $username_nq = $self->{CurrentUser}; # get current user
-	return 0 if ( $username_nq eq 'anonymous'); # allow anonymous users during peap 1
-    return 1 if (!defined($username_nq) || $username_nq eq ''); # reject empty users
-    my ($called_station_id) = split /:/, $p->getAttrByNum($Radius::Radius::CALLED_STATION_ID);
+    my ($self, $p, $called_station_id) = @_;
     return 1 unless $called_station_id; # if csid not found, reject user
     my $qcalled_station_id = $self->quote($called_station_id); # get quoted called_station_id
     my $q = &Radius::Util::format_special($self->{NasSelect}, $p, $self, $qcalled_station_id);
-    my $sth = $self->prepareAndExecute($q);
-    return 1 unless $sth; # if query execution fails, reject user
+    my $sth;
+    my $attempts = 0;
+    my $max_attempts = 3;
+    $self->log($main::LOG_DEBUG, "[ZEEP] - attempting to execute query $q");
+    while ($attempts < $max_attempts) {
+        $sth = $self->prepareAndExecute($q);
+        last if $sth; 
+        $attempts++;
+        sleep(1);
+    }
+	return 1 unless $sth;
+    $self->log($main::LOG_DEBUG, "[ZEEP] - successfully executed query $q");
     my @row = $self->getOneRow($sth);
     $sth->finish();
-    return 1 if (!$row[0]); # if not found, reject user
+    return 1 unless @row; # if not found, reject user
     return 0;
 }
 
@@ -134,36 +140,47 @@ sub is_not_allowed_nas # rejects user if nas is not allowed
 sub is_user_limits_reached # rejects user if limit reached
 {
     my ($self, $p) = @_;
-    my $username_nq = $p->getUserName(); # get unquoted current user name
-    $self->{CurrentUser} = $username_nq; # store current user for later use
-    return 1 if (!defined($username_nq) || $username_nq eq ''); # reject empty users
+	my $username_nq = $self->{CurrentUser}; # get current user
     my $qusername = $self->quote($username_nq); # get quoted user name 
     my $q = &Radius::Util::format_special($self->{QueryDataLimits}, $p, $self, $qusername); # sanitize query values
-    my $sth = $self->prepareAndExecute($q);
-    return 1 unless $sth; # if query execution fails, reject user
+    my $sth;
+    my $attempts = 0;
+    my $max_attempts = 3;
+    $self->log($main::LOG_DEBUG, "[ZEEP] - attempting to execute query $q");
+    while ($attempts < $max_attempts) {
+        $sth = $self->prepareAndExecute($q);
+        last if $sth; 
+        $attempts++;
+        sleep(1);
+    }
+	return 1 unless $sth;
 	my @row = $self->getOneRow($sth); # session_limit, remaining_session_time, bytes_limit, remaining_bytes
 	$sth->finish();
-    my $dataleft = $row[3];
-    $self->log($main::LOG_DEBUG, "[ZEEP] user $qusername remaining data left: $dataleft ", $p);
+	return 1 unless @row;
+    $self->log($main::LOG_DEBUG, "[ZEEP] - successfully executed query $q");
+    my $dataleft = $row[3] // 50000; # remaining data in bytes // default is 50k bytes if null
+    my $timeleft = $row[1] // 100;	 # remaining session time in seconds // default is 100 seconds if null
 
-    my $limittype = 2; # 1 if time based, 2 if data based // TODO REVISIT: replace static with dynamic value from DB
-    my $timeleft = 100; # // TODO REVISIT: replace static with dynamic value from DB
+	my $timestamp = time;
+    $self->log($main::LOG_DEBUG, "[ZEEP] $timestamp - user $qusername remaining data left: $dataleft, remaining time: $timeleft");
     
-    if ($limittype eq 1 ) 
-    {
-        return 1 if ($timeleft <= 0 );
-    } elsif ($limittype eq 2 ) {
-        return 1 if ($dataleft <= 0 );
-    }
+	my $limittype = 2; # 1 if time based, 2 if data based // TODO: replace with dynamic value from DB
+    $timeleft = 100 if $limittype == 2; # TODO: remove override when timeleft is pulled dynamically
+	my ($usagetype, $usagevalue) = $limittype == 1 ? ('time', $timeleft) : ('data', $dataleft);
 
-    return 0;
+    if ($usagevalue <= 0) 
+	{
+		return 1;
+	}
+
+	return 0;
 }
 
 #####################################################################
 # Retrieves current session values from accounting table
 # Returns acctinputoctets, acctoutputoctets, acctsessiontime, called_station_id of current user session
 # This function is called during every alive/stop accounting request
-sub get_current_values 
+sub get_session_values 
 {
     my ($self, $p, $qacctsessionid) = @_;
     my $q = &Radius::Util::format_special($self->{SessionSelect}, $p, $self, $qacctsessionid);
@@ -177,7 +194,7 @@ sub get_current_values
 #####################################################################
 # Updates remaining quota in subscribers table
 # This function is called during every alive/stop accounting request
-sub update_remaining_quota # TODO; UPDATE USER QUOTA IN SUBSCRIBERS TABLE
+sub update_remaining_quota 
 {
     my ($self, $p, $quser_name, $increasedinput, $increasedoutput) = @_;
 	my $totalincreasedbytes = ($increasedinput // 0) + ($increasedoutput // 0);
@@ -186,7 +203,6 @@ sub update_remaining_quota # TODO; UPDATE USER QUOTA IN SUBSCRIBERS TABLE
 	{
 		my $colvalstring = "remaining_bytes=remaining_bytes - ($totalincreasedbytes)"; # update user's remaining bytes
 		my $q = &Radius::Util::format_special($self->{AcctUpdateQuery}, $p, $self, 'subscribers', $colvalstring, 'username', $quser_name);
-		$self->log($main::LOG_DEBUG, "update quota query $q", $p);
 		$self->do($q); # execute sql query
 	}
 }
@@ -194,7 +210,7 @@ sub update_remaining_quota # TODO; UPDATE USER QUOTA IN SUBSCRIBERS TABLE
 #####################################################################
 # Updates current ap usage in ap accounting table 
 # This function is called during every alive/stop accounting request
-sub update_ap_usage # TODO; UPDATE AP USAGE IN AP_ACCOUNTING TABLE
+sub update_ap_usage 
 {
     my ($self, $p, $increasedinput, $increasedoutput, $increasedtime) = @_;
 	my ($ap_mac) = split /:/, $p->getAttrByNum($Radius::Radius::CALLED_STATION_ID);
@@ -203,7 +219,6 @@ sub update_ap_usage # TODO; UPDATE AP USAGE IN AP_ACCOUNTING TABLE
 	{
 		my $colvalstring = "totalinputoctets=totalinputoctets + ($increasedinput), totaloutputoctets=totaloutputoctets + ($increasedoutput), totalsessiontime=totalsessiontime + ($increasedtime), last_updated=now()"; # update user's remaining bytes
 		my $q = &Radius::Util::format_special($self->{AcctUpdateQuery}, $p, $self, 'ap_accounting', $colvalstring, 'called_station_id', $qap_mac);
-		$self->log($main::LOG_DEBUG, "update usage query $q", $p);
 		$self->do($q); # execute sql query
 	}
 	return;
@@ -228,10 +243,13 @@ sub handle_request
 
     if ($p->code eq 'Access-Request' || $self->{AuthenticateAccounting})
     {
+		my $username_nq = $p->getUserName(); # get user name from request
+		$self->{CurrentUser} = $username_nq; # store current user name for later use
+
 		# If AuthSQLStatement is set, parse the strings and execute them
 		if (defined $self->{AuthSQLStatement})
 		{
-			my $user_name = $p->getUserName();
+			my $user_name = $username_nq;
 			$user_name = $self->quote($user_name);
 			map {$self->do(Radius::Util::format_special($_, $p, $self, $user_name))} @{$self->{AuthSQLStatement}};
 		}
@@ -243,8 +261,10 @@ sub handle_request
 		if ($p->{"EAP-Message"}) {
 			my $username = $p->getUserName();
 			if (defined $username && $username ne '' && $username ne 'anonymous') {
-				return ($main::REJECT, 'CSID is not allowed')
-					if  $self->is_not_allowed_nas($p);
+				my ($called_station_id, $ssid) = split /:/, $p->getAttrByNum($Radius::Radius::CALLED_STATION_ID);
+
+				return ($main::REJECT, 'unauthorized NAS')
+					if  $self->is_not_allowed_nas($p, $called_station_id);
 
 				return ($main::REJECT, 'User limits reached')
 					if  $self->is_user_limits_reached($p);
@@ -297,8 +317,8 @@ sub handle_request
     }
     else
     {
-	# Send a generic reply on our behalf
-	return ($main::ACCEPT, 'Not a relevant request type');
+		# Send a generic reply on our behalf
+		return ($main::ACCEPT, 'Not a relevant request type');
     }
 }
 
@@ -427,10 +447,17 @@ sub handle_accounting
 		my $table = &Radius::Util::format_special($self->{AccountingTable}, $p, $self);
 
 		# conduct sql query based on account status type
-		my $qacctsessionid = $self->quote($p->getAttrByNum($Radius::Radius::ACCT_SESSION_ID));
+		my ($called_station_id, $ssid) = split /:/, $p->getAttrByNum($Radius::Radius::CALLED_STATION_ID);
+		my $calling_station_id = $p->getAttrByNum($Radius::Radius::CALLING_STATION_ID);
+		my $acctsessionid = $p->getAttrByNum($Radius::Radius::ACCT_SESSION_ID);
+		my $input_octets  = $p->getAttrByNum($Radius::Radius::ACCT_INPUT_OCTETS)  // 0;
+		my $output_octets = $p->getAttrByNum($Radius::Radius::ACCT_OUTPUT_OCTETS) // 0;
+		my $session_time  = $p->getAttrByNum($Radius::Radius::ACCT_SESSION_TIME)  // 0;
+		my $framed_ip_addr = $p->getAttrByNum($Radius::Radius::FRAMED_IP_ADDRESS);
+		my $nas_ip_addr = $p->getAttrByNum($Radius::Radius::NAS_IP_ADDRESS);
+		my $qacctsessionid = $self->quote($acctsessionid);
 		my $q;
-		my $sth;
-		my @row;
+
 		# INSERT new record into accounting table
 		if ($status_type eq 'Start') { 
 			# INSERT ENTRY INTO ACCOUNTING TABLE
@@ -442,15 +469,12 @@ sub handle_accounting
 		elsif ($status_type eq 'Alive' || $status_type eq 'Stop') 
 		{ 
 			# RETRIEVE CURRENT VALUES FROM ACCOUNTING TABLE
-			my @current_values = $self->get_current_values($p, $qacctsessionid);
+			my @current_values = $self->get_session_values($p, $qacctsessionid);
 			
 			# UPDATE IF VALUES WERE RETRIEVED
 			if (@current_values)
 			{
 				# DETERMINE HOW MUCH IS INCREMENTED PER VALUE 
-				my $input_octets  = $p->getAttrByNum($Radius::Radius::ACCT_INPUT_OCTETS)  // 0;
-				my $output_octets = $p->getAttrByNum($Radius::Radius::ACCT_OUTPUT_OCTETS) // 0;
-				my $session_time  = $p->getAttrByNum($Radius::Radius::ACCT_SESSION_TIME)  // 0;
 				my $increasedinput  = $input_octets  - ($current_values[0] // 0);
 				my $increasedoutput = $output_octets - ($current_values[1] // 0);
 				my $increasedtime   = $session_time  - ($current_values[2] // 0);
@@ -460,7 +484,7 @@ sub handle_accounting
 				$increasedoutput = 0 if $increasedoutput < 0;
 				$increasedtime   = 0 if $increasedtime   < 0;
 
-				# UPDATE USER REMAINING QUOTA
+				# UPDATE USER REMAINING QUOTA IN DB
 				$self->update_remaining_quota($p, $quser_name, $increasedinput, $increasedoutput);
 
 				# UPDATE AP TOTAL BANDWIDTH AND SESSION TIME 
@@ -797,9 +821,9 @@ my %querynames =
 # limits etc
 sub getLimitValue
 {
-    my ($self, $username, $check_name, $p) = @_;
+    my ($self, $username_nq, $check_name, $p) = @_;
 
-    my $qusername = $self->quote($username);
+    my $qusername = $self->quote($username_nq);
     my ($queryname, $resettime);
     my @resettime = localtime(time);
     if (   $check_name eq 'Max-All-Session'
