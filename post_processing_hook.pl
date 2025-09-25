@@ -1,8 +1,4 @@
 
-use Redis;
-use JSON;
-use DBI;
-
 sub 
 {
     &main::log($main::LOG_DEBUG, "[hook] inside post processing hook");
