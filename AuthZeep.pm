@@ -3,7 +3,7 @@ package Radius::AuthZeep;
 use Radius::AuthGeneric;
 use Radius::SqlDb;
 use DBI;
-use lib '/usr/share/perl5';
+# use lib '/usr/share/perl5';
 use Redis;
 use JSON;
 use strict;
