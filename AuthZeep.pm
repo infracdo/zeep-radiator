@@ -103,6 +103,27 @@ sub check_config
     $self->log($main::LOG_WARNING, "No RedisPassword defined")
       unless $self->{RedisPassword};
 
+	my $test_query = 'SELECT 1;';
+    my $sth;
+    my $max_retries = 3;
+    for my $attempt (1 .. $max_retries) {
+        $sth = $self->prepareAndExecute($test_query);
+        if ($sth) {
+            $self->log($main::LOG_INFO, "Database connection test succeeded on attempt $attempt");
+            last;
+        }
+        else {
+            $self->log($main::LOG_WARNING, "Database connection test failed on attempt $attempt: " . ($self->{DBI} ? $self->{DBI}->errstr : "DBI handle missing"));
+            sleep(2); # wait 2 seconds before retry
+        }
+    }
+    if (!$sth) {
+        $self->log($main::LOG_ERROR, "Database connection test failed after $max_retries attempts, continuing startup");
+    }
+    else {
+        $sth->finish();
+    }
+
     return;
 }
 
@@ -220,9 +241,7 @@ sub is_not_allowed_nas # rejects user if nas is not allowed
     return 1 unless $called_station_id; # if csid not found, reject user
     my $qcalled_station_id = $self->quote($called_station_id); # get quoted called_station_id
     my $q = &Radius::Util::format_special($self->{NasSelect}, $p, $self, $qcalled_station_id);
-    $self->log($main::LOG_DEBUG, "[ZEEP] Preparing NAS check query", $p);
-	my $sth = $self->prepareAndExecute($q);
-	$self->log($main::LOG_DEBUG, "[ZEEP] Finished NAS check query", $p);
+    my $sth = $self->prepareAndExecute($q);
     return 1 unless $sth; # if query execution fails, reject user
     my @row = $self->getOneRow($sth);
     $sth->finish();
