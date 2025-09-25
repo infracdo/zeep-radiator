@@ -220,7 +220,9 @@ sub is_not_allowed_nas # rejects user if nas is not allowed
     return 1 unless $called_station_id; # if csid not found, reject user
     my $qcalled_station_id = $self->quote($called_station_id); # get quoted called_station_id
     my $q = &Radius::Util::format_special($self->{NasSelect}, $p, $self, $qcalled_station_id);
-    my $sth = $self->prepareAndExecute($q);
+    $self->log($main::LOG_DEBUG, "[ZEEP] Preparing NAS check query", $p);
+	my $sth = $self->prepareAndExecute($q);
+	$self->log($main::LOG_DEBUG, "[ZEEP] Finished NAS check query", $p);
     return 1 unless $sth; # if query execution fails, reject user
     my @row = $self->getOneRow($sth);
     $sth->finish();
