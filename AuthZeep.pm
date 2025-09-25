@@ -3,6 +3,8 @@ package Radius::AuthZeep;
 use Radius::AuthGeneric;
 use Radius::SqlDb;
 use DBI;
+use Redis;
+use JSON;
 use strict;
 
 %Radius::AuthZeep::ConfigKeywords = 
