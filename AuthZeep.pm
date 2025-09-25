@@ -1,9 +1,9 @@
 package Radius::AuthZeep;
 @ISA = qw(Radius::AuthGeneric Radius::SqlDb);
+use lib '/usr/share/perl5';
 use Radius::AuthGeneric;
 use Radius::SqlDb;
 use DBI;
-use lib '/usr/share/perl5';
 use Redis;
 use strict;
 use JSON;
@@ -62,6 +62,30 @@ use JSON;
 # RCS version number of this module
 $Radius::AuthZeep::VERSION = '$Revision$';
 
+sub printmod {
+    my ($self) = @_;
+
+	open(my $errlog, '>>', '/var/log/radiator/session_debug.log') or die "Cannot open log file: $!";
+    print $errlog scalar(localtime) . " - Module load locations:\n";
+
+    # Debug module load locations
+    foreach my $mod (qw(
+        Radius::AuthGeneric
+        Radius::SqlDb
+        DBI
+        Redis
+        JSON
+    )) {
+		(my $path = "$mod.pm") =~ s|::|/|g;
+        if (exists $INC{$path}) {
+            print $errlog scalar(localtime) . " - $mod loaded from: $INC{$path}\n";
+        } else {
+            print $errlog scalar(localtime) . " - $mod NOT loaded\n";
+        }
+    }
+	close($errlog);
+}
+
 #####################################################################
 # Do per-instance configuration check
 # This is called by Configurable just before activate
@@ -71,6 +95,7 @@ sub check_config
 
     $self->Radius::AuthGeneric::check_config();
     $self->Radius::SqlDb::check_config();
+	printmod();
 	
 	$self->log($main::LOG_WARNING, "No RedisHost defined")
       unless $self->{RedisHost};
@@ -226,7 +251,9 @@ sub is_user_limits_reached # rejects user if limit reached
     $self->{redis}->set("timelimit:" . $username_nq,  int($timeleft), 'NX');
 
 	my $timestamp = time;
-    my $limittype = 2; # 1 if time based, 2 if data based // TODO: replace with dynamic value from DB
+    $self->log($main::LOG_DEBUG, "[ZEEP] $timestamp - user $qusername remaining data left: $dataleft, remaining time: $timeleft", $p);
+    
+	my $limittype = 2; # 1 if time based, 2 if data based // TODO: replace with dynamic value from DB
     $timeleft = 100 if $limittype == 2; # TODO: remove override when timeleft is pulled dynamically
 	my ($usagetype, $usagevalue) = $limittype == 1 ? ('time', $timeleft) : ('data', $dataleft);
 
@@ -334,6 +361,8 @@ sub handle_request
 
 				return ($main::REJECT, 'unauthorized user')
 					if  $self->is_user_limits_reached($p, $called_station_id, $ssid);
+
+				$self->log($main::LOG_DEBUG, "[ZEEP] user passed nas and limits check after initial PEAP Phase", $p);
 			}
 		}
 
