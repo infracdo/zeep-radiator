@@ -1,12 +1,12 @@
 package Radius::AuthZeep;
 @ISA = qw(Radius::AuthGeneric Radius::SqlDb);
-use lib '/usr/share/perl5';
 use Radius::AuthGeneric;
 use Radius::SqlDb;
 use DBI;
+use lib '/usr/share/perl5';
 use Redis;
-use strict;
 use JSON;
+use strict;
 
 %Radius::AuthZeep::ConfigKeywords = 
 ('AccountingTable'        => 
@@ -102,27 +102,6 @@ sub check_config
 
     $self->log($main::LOG_WARNING, "No RedisPassword defined")
       unless $self->{RedisPassword};
-
-	my $test_query = 'SELECT 1;';
-    my $sth;
-    my $max_retries = 3;
-    for my $attempt (1 .. $max_retries) {
-        $sth = $self->prepareAndExecute($test_query);
-        if ($sth) {
-            $self->log($main::LOG_INFO, "Database connection test succeeded on attempt $attempt");
-            last;
-        }
-        else {
-            $self->log($main::LOG_WARNING, "Database connection test failed on attempt $attempt: " . ($self->{DBI} ? $self->{DBI}->errstr : "DBI handle missing"));
-            sleep(2); # wait 2 seconds before retry
-        }
-    }
-    if (!$sth) {
-        $self->log($main::LOG_ERROR, "Database connection test failed after $max_retries attempts, continuing startup");
-    }
-    else {
-        $sth->finish();
-    }
 
     return;
 }
@@ -241,11 +220,21 @@ sub is_not_allowed_nas # rejects user if nas is not allowed
     return 1 unless $called_station_id; # if csid not found, reject user
     my $qcalled_station_id = $self->quote($called_station_id); # get quoted called_station_id
     my $q = &Radius::Util::format_special($self->{NasSelect}, $p, $self, $qcalled_station_id);
-    my $sth = $self->prepareAndExecute($q);
-    return 1 unless $sth; # if query execution fails, reject user
+    my $sth;
+    my $attempts = 0;
+    my $max_attempts = 3;
+    $self->log($main::LOG_DEBUG, "[ZEEP] - attempting to execute query $q");
+    while ($attempts < $max_attempts) {
+        $sth = $self->prepareAndExecute($q);
+        last if $sth; 
+        $attempts++;
+        sleep(1);
+    }
+	return 1 unless $sth;
+    $self->log($main::LOG_DEBUG, "[ZEEP] - successfully executed query $q");
     my @row = $self->getOneRow($sth);
     $sth->finish();
-    return 1 if (!$row[0]); # if not found, reject user
+    return 1 unless @row; # if not found, reject user
     return 0;
 }
 
@@ -256,14 +245,25 @@ sub is_not_allowed_nas # rejects user if nas is not allowed
 # This function is called during every access request
 sub is_user_limits_reached # rejects user if limit reached
 {
-    my ($self, $p, $called_station_id, $ssid) = @_;
+    my ($self, $p) = @_;
 	my $username_nq = $self->{CurrentUser}; # get current user
     my $qusername = $self->quote($username_nq); # get quoted user name 
     my $q = &Radius::Util::format_special($self->{QueryDataLimits}, $p, $self, $qusername); # sanitize query values
-    my $sth = $self->prepareAndExecute($q);
-    return 1 unless $sth; # if query execution fails, reject user
+    my $sth;
+    my $attempts = 0;
+    my $max_attempts = 3;
+    $self->log($main::LOG_DEBUG, "[ZEEP] - attempting to execute query $q");
+    while ($attempts < $max_attempts) {
+        $sth = $self->prepareAndExecute($q);
+        last if $sth; 
+        $attempts++;
+        sleep(1);
+    }
+	return 1 unless $sth;
 	my @row = $self->getOneRow($sth); # session_limit, remaining_session_time, bytes_limit, remaining_bytes
 	$sth->finish();
+	return 1 unless @row;
+    $self->log($main::LOG_DEBUG, "[ZEEP] - successfully executed query $q");
     my $dataleft = $row[3] // 50000; # remaining data in bytes // default is 50k bytes if null
     my $timeleft = $row[1] // 100;	 # remaining session time in seconds // default is 100 seconds if null
 	
@@ -272,7 +272,7 @@ sub is_user_limits_reached # rejects user if limit reached
     $self->{redis}->set("timelimit:" . $username_nq,  int($timeleft), 'NX');
 
 	my $timestamp = time;
-    $self->log($main::LOG_DEBUG, "[ZEEP] $timestamp - user $qusername remaining data left: $dataleft, remaining time: $timeleft", $p);
+    $self->log($main::LOG_DEBUG, "[ZEEP] $timestamp - user $qusername remaining data left: $dataleft, remaining time: $timeleft");
     
 	my $limittype = 2; # 1 if time based, 2 if data based // TODO: replace with dynamic value from DB
     $timeleft = 100 if $limittype == 2; # TODO: remove override when timeleft is pulled dynamically
@@ -369,7 +369,7 @@ sub handle_request
 			if $self->{AuthSelect} eq '';
 
 		if ($p->get_attr('EAP-MESSAGE') || $p->get_attr('MS-CHAP2-Response')) {
-			$self->log($main::LOG_DEBUG, "[ZEEP] Skipping CSID/limit checks during PEAP Phase 1 for user $username_nq", $p);
+			$self->log($main::LOG_DEBUG, "[ZEEP] Skipping CSID/limit checks during PEAP Phase 1 for user $username_nq");
 		} else {
 			return ($main::REJECT, 'User name is not defined') 
 				if (!defined($username_nq) || $username_nq eq ''); # reject undefined users
@@ -381,9 +381,9 @@ sub handle_request
 					if  $self->is_not_allowed_nas($p, $called_station_id);
 
 				return ($main::REJECT, 'unauthorized user')
-					if  $self->is_user_limits_reached($p, $called_station_id, $ssid);
+					if  $self->is_user_limits_reached($p);
 
-				$self->log($main::LOG_DEBUG, "[ZEEP] user passed nas and limits check after initial PEAP Phase", $p);
+				$self->log($main::LOG_DEBUG, "[ZEEP] user passed nas and limits check after initial PEAP Phase");
 			}
 		}
 
