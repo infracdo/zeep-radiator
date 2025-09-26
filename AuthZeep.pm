@@ -4,7 +4,6 @@ use Radius::AuthGeneric;
 use Radius::SqlDb;
 use DBI;
 use Redis;
-use JSON;
 use strict;
 
 %Radius::AuthZeep::ConfigKeywords = 
@@ -155,7 +154,7 @@ sub connect_redis {
 		$self->{redis} = $r;
 		$self->{redis_connected} = 1;
 		$self->{reconnect_in_progress} = 0;
-        $self->log($main::LOG_ERR, "[Redis] Redis connection successful");
+        $self->log($main::LOG_DEBUG, "[Redis] Redis connection successful");
 	};
 	if ($@) {
         $self->log($main::LOG_ERR, "[Redis] Redis connection failed: $@");
@@ -285,7 +284,7 @@ sub enqueue_accounting_job {
 		nas_ip_addr => $nas_ip_addr, 
 		timestamp => time, 
 		};
-		my $job_json = encode_json($job);
+		my $job_json = &Radius::Util::encode_json($job);
 		$self->{redis}->rpush('radiator:jobs:accounting', $job_json);
 		$self->log($main::LOG_INFO, "[Redis] Pushed ap accounting for csid $called_station_id");
 	} 
