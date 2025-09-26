@@ -3,7 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - radiator-prod-talos # Trigger on pushes to the main branch
+      - redis-scratch # Trigger on pushes to the main branch
 
 jobs:
   build-and-push:
@@ -25,10 +25,10 @@ jobs:
       # Step 3: Build the Docker image
       - name: Build Docker Image
         run: 
-          docker build -t zeep-radiator:prod .
+          docker build -t zeep-radiator:sbx .
 
       # Step 4: Push the Docker image
       - name: Push Docker Image
         run: |
-          docker tag zeep-radiator:prod infracdo/zeep-radiator:prod
-          docker push infracdo/zeep-radiator:prod
+          docker tag zeep-radiator:sbx infracdo/zeep-radiator:sbx
+          docker push infracdo/zeep-radiator:sbx
