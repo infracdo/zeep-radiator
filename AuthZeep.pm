@@ -130,14 +130,14 @@ sub try_reconnect_redis {
     $self->connect_redis() unless $self->{redis_connected}; # if not connected, attempt to connect
 
 	if ($self->{redis_connected}) {
-        $self->log($main::LOG_INFO, "[ZEEP] $self->{log_class_identifier}: Successfully connected to Redis");
+        $self->log($main::LOG_INFO, "[Redis] $self->{log_class_identifier}: Successfully connected to Redis");
     }
 	else
     {
 		if ($self->{FailureBackoffTime})
 		{
 			# Schedule a reconnect attempt
-			$self->log($main::LOG_INFO, "[ZEEP] $self->{log_class_identifier}: Will try to reconnect to Redis in $self->{FailureBackoffTime} second(s)");
+			$self->log($main::LOG_INFO, "[Redis] $self->{log_class_identifier}: Will try to reconnect to Redis in $self->{FailureBackoffTime} second(s)");
 			Radius::Select::add_timeout(time + $self->{FailureBackoffTime}, \&try_reconnect_redis, $self);
 			$self->{reconnect_in_progress} = 1;
 		}
@@ -163,7 +163,99 @@ sub connect_redis {
 }
 
 #####################################################################
-# Verifies if csid has permission to access
+# Initializes user limit to Redis
+# 
+sub set_user_rlimit {
+    my ($self, $username_nq, $dataleft, $timeleft) = @_;
+	$dataleft //= 50000000;  # if $dataleft is undefined, set to 50 million octets/50 mb
+	$timeleft //= 100;  # if $timeleft is undefined, set to 100 secs
+
+	if ($self->{redis}) 
+	{
+		$self->log($main::LOG_INFO, "[Redis] setting data and time limit for user $username_nq");
+		$self->{redis}->set("datalimit:" . $username_nq, int($dataleft/1000), 'NX'); # store as KB not KiB
+		$self->{redis}->set("timelimit:" . $username_nq, int($timeleft), 'NX');
+	} 
+	else 
+	{
+		$self->log($main::LOG_INFO, "[Redis] not initialized. Skipping limit set for user $username_nq");
+	} 
+}
+
+#####################################################################
+# Updates user data limit, usage, and time to Redis
+# 
+sub update_user_raccounting {
+    my ($self, $username_nq, $increasedinput, $increasedoutput, $increasedtime) = @_;
+
+	if ($self->{redis}) 
+	{
+		$self->log($main::LOG_INFO, "[Redis] updating data limit, usage, and time for user $username_nq");
+		$self->{redis}->decrby("datalimit:" . $username_nq, $increasedinput + $increasedoutput);
+		$self->{redis}->incrby("usage:" . $username_nq, $increasedinput + $increasedoutput);
+		$self->{redis}->incrby("time:" . $username_nq, $increasedtime);
+	} 
+	else 
+	{
+		$self->log($main::LOG_INFO, "[Redis] not initialized. Skipping accounting update for user $username_nq");
+	} 
+}
+
+#####################################################################
+# Updates ap usage and time to Redis
+#
+sub update_ap_raccounting {
+    my ($self, $called_station_id, $increasedinput, $increasedoutput, $increasedtime) = @_;
+
+	if ($self->{redis}) 
+	{
+		$self->log($main::LOG_INFO, "[Redis] updating usage and time for csid $called_station_id");
+		$self->{redis}->incrby("usage:" . $called_station_id, $increasedinput + $increasedoutput);
+		$self->{redis}->incrby("time:" . $called_station_id, $increasedtime);
+	} 
+	else 
+	{
+		$self->log($main::LOG_INFO, "[Redis] not initialized. Skipping accounting update for csid $called_station_id");
+	} 
+}
+
+#####################################################################
+# Enqueues accounting job to redis
+#
+sub enqueue_accounting_job {
+    my ($self, $status_type, $called_station_id, $ssid, $calling_station_id, $subscriber_id, $session_id, $session_time, $input_octets, $output_octets, $framed_ip_addr, $nas_ip_addr) = @_;
+
+	if ($self->{redis}) 
+	{
+		$self->log($main::LOG_INFO, "[Redis] pushing ap session for csid $called_station_id");
+
+		my $job = {
+		status_type => $status_type,
+		called_station_id => $called_station_id, 
+		ssid => $ssid, 
+		calling_station_id => $calling_station_id, 
+		subscriber_id => $subscriber_id, 
+		session_id => $session_id, 
+		session_time => $session_time, 
+		input_octets => $input_octets, 
+		output_octets => $output_octets, 
+		framed_ip_addr => $framed_ip_addr, 
+		nas_ip_addr => $nas_ip_addr, 
+		timestamp => time, 
+		};
+		my $job_json = encode_json($job);
+		$self->{redis}->rpush('radiator:jobs:accounting', $job_json);
+		$self->log($main::LOG_INFO, "[Redis] pushed ap accounting for csid $called_station_id");
+	} 
+	else
+	{
+		$self->log($main::LOG_INFO, "[Redis] not initialized. Skipping accounting job for user $subscriber_id");
+	} 
+
+}
+
+#####################################################################
+# Verifies if ap has permission to access
 # and rejects access if not permitted.
 # Returns 1 to reject, 0 to allow access.
 # This function is called during every access request
@@ -176,7 +268,7 @@ sub is_not_allowed_nas # rejects user if nas is not allowed
     my $sth;
     my $attempts = 0;
     my $max_attempts = 3;
-    $self->log($main::LOG_DEBUG, "[ZEEP] - attempting to execute query $q");
+    $self->log($main::LOG_DEBUG, "[Database] - attempting to execute query $q");
     while ($attempts < $max_attempts) {
         $sth = $self->prepareAndExecute($q);
         last if $sth; 
@@ -184,7 +276,7 @@ sub is_not_allowed_nas # rejects user if nas is not allowed
         sleep(1);
     }
 	return 1 unless $sth;
-    $self->log($main::LOG_DEBUG, "[ZEEP] - successfully executed query $q");
+    $self->log($main::LOG_DEBUG, "[Database] - successfully executed query $q");
     my @row = $self->getOneRow($sth);
     $sth->finish();
     return 1 unless @row; # if not found, reject user
@@ -205,20 +297,27 @@ sub is_user_limits_reached # rejects user if limit reached
     my $sth;
     my $attempts = 0;
     my $max_attempts = 3;
-    $self->log($main::LOG_DEBUG, "[ZEEP] - attempting to execute query $q");
+
+    $self->log($main::LOG_DEBUG, "[Database] - attempting to execute query $q");
     while ($attempts < $max_attempts) {
         $sth = $self->prepareAndExecute($q);
         last if $sth; 
         $attempts++;
         sleep(1);
     }
+
 	return 1 unless $sth;
+
 	my @row = $self->getOneRow($sth); # session_limit, remaining_session_time, bytes_limit, remaining_bytes
 	$sth->finish();
 	return 1 unless @row;
-    $self->log($main::LOG_DEBUG, "[ZEEP] - successfully executed query $q");
-    my $dataleft = $row[3] // 50000; # remaining data in bytes // default is 50k bytes if null
-    my $timeleft = $row[1] // 100;	 # remaining session time in seconds // default is 100 seconds if null
+
+    $self->log($main::LOG_DEBUG, "[Database] - successfully executed query $q");
+
+    my $dataleft = $row[3]; 
+    my $timeleft = $row[1];	
+	
+	$self->set_user_rlimit($username_nq, $dataleft, $timeleft);
 
 	my $timestamp = time;
     $self->log($main::LOG_DEBUG, "[ZEEP] $timestamp - user $qusername remaining data left: $dataleft, remaining time: $timeleft");
@@ -330,7 +429,7 @@ sub handle_request
 
 				$self->log($main::LOG_DEBUG, "[ZEEP] user passed nas and limits check", $p);
 			} else {
-				$self->log($main::LOG_DEBUG, "[ZEEP] Skipping CSID/limit checks during PEAP Phase 1 for user $username", $p);
+				$self->log($main::LOG_DEBUG, "[ZEEP] Skipping nas and limit checks during PEAP Phase 1 for user $username", $p);
 			}
 		}
 
@@ -546,8 +645,14 @@ sub handle_accounting
 				# UPDATE USER REMAINING QUOTA IN DB
 				$self->update_remaining_quota($p, $quser_name, $increasedinput, $increasedoutput);
 
+				# UPDATE USER REMAINING QUOTA, DATA USAGE, AND SESSION TIME IN REDIS
+				$self->update_user_raccounting($username_nq, $increasedinput, $increasedoutput, $increasedtime);
+
 				# UPDATE AP TOTAL BANDWIDTH AND SESSION TIME 
 				$self->update_ap_usage($p, $increasedinput, $increasedoutput, $increasedtime);
+
+				# UPDATE AP DATA USAGE AND SESSION TIME IN REDIS
+				$self->update_ap_raccounting($called_station_id, $increasedinput, $increasedoutput, $increasedtime);
 			} 
 
 			# UPDATE ACCOUNTING ENTRY
@@ -555,6 +660,10 @@ sub handle_accounting
 			$q = &Radius::Util::format_special
 			($self->{AcctUpdateQuery}, $p, $self, $table, $colsvals, 'acctsessionid', $qacctsessionid);
 		}
+
+		# PUSH REDIS ACCOUNTING JOB 
+		$self->enqueue_accounting_job($status_type, $called_station_id, $ssid, $calling_station_id, $username_nq, $acctsessionid, $session_time, $input_octets, $output_octets, $framed_ip_addr, $nas_ip_addr);
+
 		# Execute the insert, and if it fails, log the accounting
 		# record to a file
 		if (!$self->do($q))
