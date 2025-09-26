@@ -173,9 +173,15 @@ sub set_user_rlimit {
 	if ($self->{redis}) 
 	{
 		$self->log($main::LOG_INFO, "[Redis] Setting data and time limit for user $username_nq");
-		$self->{redis}->set("datalimit:" . $username_nq, int($dataleft/1000), 'NX'); # store as KB not KiB
-		$self->{redis}->set("timelimit:" . $username_nq, int($timeleft), 'NX');
-		$self->log($main::LOG_INFO, "[Redis] Finished setting data and time limit for user $username_nq");
+		eval {
+			$self->{redis}->set("datalimit:" . $username_nq, int($dataleft/1000), 'NX'); # store as KB not KiB
+			$self->{redis}->set("timelimit:" . $username_nq, int($timeleft), 'NX');
+		};
+		if ($@) {
+			$self->log($main::LOG_ERROR, "[Redis] Failed to set data and time limit for user $username_nq: $@");
+		} else {
+			$self->log($main::LOG_INFO, "[Redis] Finished setting data and time limit for user $username_nq");
+		}
 	} 
 	else 
 	{
@@ -284,9 +290,16 @@ sub enqueue_accounting_job {
 		nas_ip_addr => $nas_ip_addr, 
 		timestamp => time, 
 		};
+
 		my $job_json = &Radius::Util::encode_json($job);
-		$self->{redis}->rpush('radiator:jobs:accounting', $job_json);
-		$self->log($main::LOG_INFO, "[Redis] Pushed ap accounting for csid $called_station_id");
+		eval {
+			$self->{redis}->rpush('radiator:jobs:accounting', $job_json);
+		};
+		if ($@) {
+			$self->log($main::LOG_ERROR, "[Redis] Failed to push ap accounting for csid $called_station_id: $@");
+		} else {
+			$self->log($main::LOG_INFO, "[Redis] Pushed ap accounting for csid $called_station_id");
+		}
 	} 
 	else
 	{
