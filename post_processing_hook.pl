@@ -13,7 +13,7 @@ sub
     # proceed if csid is defined and code is either Access-Accept or Access-Reject
     return unless defined $csid && defined $code && ($code eq 'Access-Accept' || $code eq 'Access-Reject');
 
-    # log successful login to database
+    # update database
     my ($dbh, $sth);
     eval {
         if ($code eq 'Access-Accept')
@@ -31,20 +31,20 @@ sub
                 $sth->execute($username, $csid);
                 $sth->finish;
                 $dbh->disconnect;
+                &main::log($main::LOG_DEBUG, "[hook] made changes to nas_session_mac_attrs for $username, $csid");
             }
         }
     };
     if ($@) {
-        &main::log($main::LOG_WARNING, "Failed to log successful login to DB: $@");
+        &main::log($main::LOG_WARNING, "Failed to update database: $@");
         open(my $errlog, '>>', '/var/log/radiator/session_debug.log');
         print $errlog scalar(localtime) . " - POST PROCESSING HOOK ENCOUNTERED DB ERROR: $@\n";
         close($errlog);
     }
 
     &main::log($main::LOG_WARNING, "Stopping post processing hook before redis implementation");
-    return;
 
-    # push login job to redis
+    # update redis
     my $redis;
     eval {
         $redis = Redis->new(server => '192.168.61.23:6379', reconnect => 10, every => 10000);
