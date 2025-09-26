@@ -148,17 +148,18 @@ sub try_reconnect_redis {
 sub connect_redis {
     my ($self) = @_;
 	eval {
-		my $r = Redis->new(server => $self->{RedisHost} . ":6379");
-		$r->auth( $self->{RedisPassword});  
+		my $r = Redis->new(server => $self->{RedisHost} . ":6379", reconnect => 10, every => 1_000_000, cnx_timeout => 6, read_timeout  => 4, write_timeout => 4);
+		$r->auth($self->{RedisPassword});  
 		$r->select($self->{DbIndex});
 		$self->{redis} = $r;
 		$self->{redis_connected} = 1;
 		$self->{reconnect_in_progress} = 0;
-        $self->log($main::LOG_DEBUG, "[Redis] Redis connection successful");
+        $self->log($main::LOG_DEBUG, "[Redis] Authentication successful. Connected to " . $self->{RedisHost} . ":6379");
 	};
 	if ($@) {
-        $self->log($main::LOG_ERR, "[Redis] Redis connection failed: $@");
+        $self->log($main::LOG_ERR, "[Redis] Authentication failed. Cannot connect to " . $self->{RedisHost} . ":6379: $@");
         $self->{redis_connected} = 0;
+		$self->{redis} = undef;
     }
 }
 
@@ -170,7 +171,7 @@ sub set_user_rlimit {
 	$dataleft //= 50_000_000;  # if $dataleft is undefined, set to 50 million octets/50 mb
 	$timeleft //= 100;  # if $timeleft is undefined, set to 100 secs
 
-	if ($self->{redis}) 
+	if ($self->{redis_connected}) 
 	{
 		$self->log($main::LOG_INFO, "[Redis] Setting data and time limit for user $username_nq");
 		eval {
@@ -229,7 +230,7 @@ sub redis_decrby {
 sub update_user_raccounting {
     my ($self, $username_nq, $totalincreasedbytes, $increasedtime) = @_;
 
-	if ($self->{redis}) 
+	if ($self->{redis_connected}) 
 	{
 		my $data_to_update = int($totalincreasedbytes / 1000); # convert octets to KB
 		 
@@ -251,7 +252,7 @@ sub update_user_raccounting {
 sub update_ap_raccounting {
     my ($self, $called_station_id, $totalincreasedbytes, $increasedtime) = @_;
 
-	if ($self->{redis}) 
+	if ($self->{redis_connected}) 
 	{
 		my $data_to_update = int($totalincreasedbytes / 1000); # convert octets to KB
 		
@@ -272,7 +273,7 @@ sub update_ap_raccounting {
 sub enqueue_accounting_job {
     my ($self, $status_type, $called_station_id, $ssid, $calling_station_id, $subscriber_id, $session_id, $session_time, $input_octets, $output_octets, $framed_ip_addr, $nas_ip_addr) = @_;
 
-	if ($self->{redis}) 
+	if ($self->{redis_connected}) 
 	{
 		$self->log($main::LOG_INFO, "[Redis] Pushing ap accounting for csid $called_station_id");
 
