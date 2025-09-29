@@ -86,7 +86,6 @@ sub activate
 
     $self->Radius::AuthGeneric::activate;
     $self->Radius::SqlDb::activate;
-	try_reconnect_redis(undef, $self);
 
     return;
 }
@@ -114,53 +113,7 @@ sub initialize
     $self->{NullPasswordMatchesAny} = 1;
     $self->{CurrentUser} = undef;
 
-    $self->{FailureBackoffTime} = 10;
-    $self->{redis_connected} = 0;
-    $self->{reconnect_in_progress} = 0;
-    $self->{DbIndex} = 0;
-    $self->{redis} = undef;
-
     return;
-}
-
-sub try_reconnect_redis {
-    my ($handle, $self) = @_;
-
-    $self->connect_redis() unless $self->{redis_connected}; # if not connected, attempt to connect
-
-	if ($self->{redis_connected}) {
-        $self->log($main::LOG_INFO, "[Redis] $self->{log_class_identifier}: Successfully connected to Redis");
-    }
-	else
-    {
-		if ($self->{FailureBackoffTime})
-		{
-			# Schedule a reconnect attempt
-			$self->log($main::LOG_INFO, "[Redis] $self->{log_class_identifier}: Will try to reconnect to Redis in $self->{FailureBackoffTime} second(s)");
-			Radius::Select::add_timeout(time + $self->{FailureBackoffTime}, \&try_reconnect_redis, $self);
-			$self->{reconnect_in_progress} = 1;
-		}
-    }
-
-    return;
-}
-
-sub connect_redis {
-    my ($self) = @_;
-	eval {
-		my $r = Redis->new(server => $self->{RedisHost} . ":6379", reconnect => 10, every => 1_000_000, cnx_timeout => 6, read_timeout  => 4, write_timeout => 4);
-		$r->auth($self->{RedisPassword});  
-		$r->select($self->{DbIndex});
-		$self->{redis} = $r;
-		$self->{redis_connected} = 1;
-		$self->{reconnect_in_progress} = 0;
-        $self->log($main::LOG_DEBUG, "[Redis] Authentication successful. Connected to " . $self->{RedisHost} . ":6379");
-	};
-	if ($@) {
-        $self->log($main::LOG_ERR, "[Redis] Authentication failed. Cannot connect to " . $self->{RedisHost} . ":6379: $@");
-        $self->{redis_connected} = 0;
-		$self->{redis} = undef;
-    }
 }
 
 #####################################################################
@@ -171,142 +124,26 @@ sub set_user_rlimit {
 	$dataleft //= 50_000_000;  # if $dataleft is undefined, set to 50 million octets/50 mb
 	$timeleft //= 100;  # if $timeleft is undefined, set to 100 secs
 
-	if ($self->{redis_connected}) 
-	{
-		$self->log($main::LOG_INFO, "[Redis] Setting data and time limit for user $username_nq");
-		eval {
-			$self->{redis}->set("datalimit:" . $username_nq, int($dataleft/1000), 'NX'); # store as KB not KiB
-			$self->{redis}->set("timelimit:" . $username_nq, int($timeleft), 'NX');
-		};
-		if ($@) {
-			$self->log($main::LOG_ERROR, "[Redis] Failed to set data and time limit for user $username_nq: $@");
-		} else {
-			$self->log($main::LOG_INFO, "[Redis] Finished setting data and time limit for user $username_nq");
-		}
-	} 
-	else 
-	{
-		$self->log($main::LOG_INFO, "[Redis] Not initialized. Skipping limit set for user $username_nq");
-	} 
-}
+	eval {
+		$self->log($main::LOG_DEBUG, "[Redis] Attempting to connect to " . $self->{RedisHost} . ":6379");
+		my $r = Redis->new(server => $self->{RedisHost} . ":6379", reconnect => 10);
+		$r->auth($self->{RedisPassword});  
+		$self->log($main::LOG_DEBUG, "[Redis] Authentication successful. Connected to " . $self->{RedisHost} . ":6379");
+		if ($r && $r->ping) 
+		{
+			$self->log($main::LOG_INFO, "[Redis] Updating data and time limit for user $username_nq");
+			$r->set("datalimit:" . $username_nq, int($dataleft/1000)); # store as KB not KiB
+			$r->set("timelimit:" . $username_nq, int($timeleft));
+			$self->log($main::LOG_INFO, "[Redis] Updated data and time limit for user $username_nq");
+			$r->quit;
+		} 
 
-#####################################################################
-# Increments key to Redis
-# 
-sub redis_incrby {
-    my ($self, $key, $value) = @_;
-    return unless defined $value && $value =~ /^\d+$/;  # only positive integers
-
-    eval {
-        $self->{redis}->incrby($key, $value);
-    };
-    if ($@) {
-        $self->log($main::LOG_ERROR, "[Redis] Failed to INCRBY $key by $value: $@");
-    } else {
-        $self->log($main::LOG_DEBUG, "[Redis] INCRBY $key by $value succeeded");
-    }
-}
-
-#####################################################################
-# Decrements key to Redis
-# 
-sub redis_decrby {
-    my ($self, $key, $value) = @_;
-    return unless defined $value && $value =~ /^\d+$/;  # only positive integers
-
-    eval {
-        $self->{redis}->decrby($key, $value);
-    };
-    if ($@) {
-        $self->log($main::LOG_ERROR, "[Redis] Failed to DECRBY $key by $value: $@");
-    } else {
-        $self->log($main::LOG_DEBUG, "[Redis] DECRBY $key by $value succeeded");
-    }
-}
-
-#####################################################################
-# Updates user data limit, usage, and time to Redis
-# 
-sub update_user_raccounting {
-    my ($self, $username_nq, $totalincreasedbytes, $increasedtime) = @_;
-
-	if ($self->{redis_connected}) 
-	{
-		my $data_to_update = int($totalincreasedbytes / 1000); # convert octets to KB
-		 
-		$self->log($main::LOG_INFO, "[Redis] Updating data limit, usage, and time for user $username_nq");
-		$self->redis_decrby("datalimit:" . $username_nq, $data_to_update); # in KB 
-		$self->redis_incrby("usage:" . $username_nq, $data_to_update); # in KB
-		$self->redis_incrby("time:" . $username_nq, $increasedtime);
-		$self->log($main::LOG_INFO, "[Redis] Updated data limit, usage, and time for user $username_nq");
-	} 
-	else 
-	{
-		$self->log($main::LOG_INFO, "[Redis] Not initialized. Skipping accounting update for user $username_nq");
-	} 
-}
-
-#####################################################################
-# Updates ap usage and time to Redis
-#
-sub update_ap_raccounting {
-    my ($self, $called_station_id, $totalincreasedbytes, $increasedtime) = @_;
-
-	if ($self->{redis_connected}) 
-	{
-		my $data_to_update = int($totalincreasedbytes / 1000); # convert octets to KB
-		
-		$self->log($main::LOG_INFO, "[Redis] Updating usage and time for csid $called_station_id");
-		$self->redis_incrby("usage:" . $called_station_id, $data_to_update); # in KB
-		$self->redis_incrby("time:" . $called_station_id, $increasedtime);
-		$self->log($main::LOG_INFO, "[Redis] Updated usage and time for csid $called_station_id");
-	} 
-	else 
-	{
-		$self->log($main::LOG_INFO, "[Redis] Not initialized. Skipping accounting update for csid $called_station_id");
-	} 
-}
-
-#####################################################################
-# Enqueues accounting job to redis
-#
-sub enqueue_accounting_job {
-    my ($self, $status_type, $called_station_id, $ssid, $calling_station_id, $subscriber_id, $session_id, $session_time, $input_octets, $output_octets, $framed_ip_addr, $nas_ip_addr) = @_;
-
-	if ($self->{redis_connected}) 
-	{
-		$self->log($main::LOG_INFO, "[Redis] Pushing ap accounting for csid $called_station_id");
-
-		my $job = {
-		status_type => $status_type,
-		called_station_id => $called_station_id, 
-		ssid => $ssid, 
-		calling_station_id => $calling_station_id, 
-		subscriber_id => $subscriber_id, 
-		session_id => $session_id, 
-		session_time => $session_time, 
-		input_octets => $input_octets, 
-		output_octets => $output_octets, 
-		framed_ip_addr => $framed_ip_addr, 
-		nas_ip_addr => $nas_ip_addr, 
-		timestamp => time, 
-		};
-
-		my $job_json = &Radius::Util::encode_json($job);
-		eval {
-			$self->{redis}->rpush('radiator:jobs:accounting', $job_json);
-		};
-		if ($@) {
-			$self->log($main::LOG_ERROR, "[Redis] Failed to push ap accounting for csid $called_station_id: $@");
-		} else {
-			$self->log($main::LOG_INFO, "[Redis] Pushed ap accounting for csid $called_station_id");
-		}
-	} 
-	else
-	{
-		$self->log($main::LOG_INFO, "[Redis] Not initialized. Skipping accounting job for user $subscriber_id");
-	} 
-
+	};
+	if ($@) {
+		$self->log($main::LOG_ERROR, "[Redis] Failed to set data and time limit for user $username_nq: $@");
+	} else {
+		$self->log($main::LOG_INFO, "[Redis] Finished setting data and time limit for user $username_nq");
+	}
 }
 
 #####################################################################
@@ -411,7 +248,6 @@ sub get_session_values
 sub update_remaining_quota 
 {
     my ($self, $p, $quser_name, $totalincreasedbytes) = @_;
-	$totalincreasedbytes = 0 if $totalincreasedbytes < 0;
 	if ($totalincreasedbytes > 0) # only update if there is an increase
 	{
 		my $colvalstring = "remaining_bytes=remaining_bytes - ($totalincreasedbytes)"; # update user's remaining bytes
@@ -665,7 +501,17 @@ sub handle_accounting
 		my $nas_ip_addr = $p->getAttrByNum($Radius::Radius::NAS_IP_ADDRESS);
 		my $qacctsessionid = $self->quote($acctsessionid);
 		my $q;
+		my $r;
 
+		eval {
+			$self->log($main::LOG_DEBUG, "[Redis] Attempting to connect to " . $self->{RedisHost} . ":6379");
+			$r = Redis->new(server => $self->{RedisHost} . ":6379", reconnect => 10);
+			$r->auth($self->{RedisPassword});  
+			$self->log($main::LOG_DEBUG, "[Redis] Authentication successful. Connected to " . $self->{RedisHost} . ":6379");
+		};
+		if ($@) {
+			$self->log($main::LOG_ERR, "[Redis] Authentication failed. Cannot connect to " . $self->{RedisHost} . ":6379: $@");
+		}
 		# INSERT new record into accounting table
 		if ($status_type eq 'Start') { 
 			# INSERT ENTRY INTO ACCOUNTING TABLE
@@ -678,14 +524,12 @@ sub handle_accounting
 		{ 
 			# RETRIEVE CURRENT VALUES FROM ACCOUNTING TABLE
 			my @current_values = $self->get_session_values($p, $qacctsessionid);
-			
-			# UPDATE IF VALUES WERE RETRIEVED
-			if (@current_values)
+			if (@current_values) # UPDATE IF VALUES WERE RETRIEVED
 			{
 				# DETERMINE HOW MUCH IS INCREMENTED PER VALUE 
-				my $increasedinput  = $input_octets  - ($current_values[0] // 0);
-				my $increasedoutput = $output_octets - ($current_values[1] // 0);
-				my $increasedtime   = $session_time  - ($current_values[2] // 0);
+				my $increasedinput  = $input_octets  - int($current_values[0] // 0);
+				my $increasedoutput = $output_octets - int($current_values[1] // 0);
+				my $increasedtime   = $session_time  - int($current_values[2] // 0);
 
 				# SANITIZE INVALID VALUES 
 				$increasedinput  = 0 if $increasedinput  < 0;
@@ -693,22 +537,32 @@ sub handle_accounting
 				$increasedtime   = 0 if $increasedtime   < 0;
 
 				# ONLY UPDATE IF VALUE(S) CHANGED
-				if ($increasedinput != 0 && $increasedoutput != 0 && $increasedtime != 0)
+				if (($increasedinput + $increasedoutput) != 0 || $increasedtime != 0)
 				{
-					# convert and sanitize data to be used by Redis
-					my $totalincreasedbytes = int($increasedinput + $increasedoutput);  
-
 					# UPDATE USER REMAINING QUOTA IN DB
-					$self->update_remaining_quota($p, $quser_name, $totalincreasedbytes);
-
-					# UPDATE USER REMAINING QUOTA, DATA USAGE, AND SESSION TIME IN REDIS
-					$self->update_user_raccounting($username_nq, $totalincreasedbytes, $increasedtime);
+					$self->update_remaining_quota($p, $quser_name, ($increasedinput + $increasedoutput));
 
 					# UPDATE AP TOTAL BANDWIDTH AND SESSION TIME IN DB
 					$self->update_ap_usage($p, $called_station_id, $increasedinput, $increasedoutput, $increasedtime);
 
-					# UPDATE AP DATA USAGE AND SESSION TIME IN REDIS
-					$self->update_ap_raccounting($called_station_id, $totalincreasedbytes, $increasedtime);
+					eval {
+						if ($r && $r->ping) { # push to redis if connection exists
+							my $data_to_update = int(($increasedinput + $increasedoutput) / 1000);
+							# UPDATE USER AND AP ACCOUNTING IN REDIS
+							$self->log($main::LOG_INFO, "[Redis] Updating data limit, usage, and time for user $username_nq");
+							$r->multi();
+							$r->incrby("datalimit:" . $username_nq, $data_to_update); # in KB 
+							$r->incrby("usage:" . $username_nq, $data_to_update); # in KB
+							$r->incrby("time:" . $username_nq, $increasedtime);
+							$r->incrby("usage:" . $called_station_id, $data_to_update); # in KB
+							$r->incrby("time:" . $called_station_id, $increasedtime);
+							$r->exec();
+							$self->log($main::LOG_INFO, "[Redis] Updated data limit, usage, and time for user $username_nq");
+						}
+					};
+					if ($@) {
+						$self->log($main::LOG_ERROR, "[Redis] Failed to push accounting for user $username_nq: $@");
+					}
 				} 
 			} 
 
@@ -718,8 +572,33 @@ sub handle_accounting
 			($self->{AcctUpdateQuery}, $p, $self, $table, $colsvals, 'acctsessionid', $qacctsessionid);
 		}
 
-		# PUSH REDIS ACCOUNTING JOB 
-		$self->enqueue_accounting_job($status_type, $called_station_id, $ssid, $calling_station_id, $username_nq, $acctsessionid, $session_time, $input_octets, $output_octets, $framed_ip_addr, $nas_ip_addr);
+		eval {
+			if ($r && $r->ping) { # execute then cleanup connection if it exists
+				$self->log($main::LOG_INFO, "[Redis] Pushing ap accounting for csid $called_station_id");
+				my $job = {
+					status_type => $status_type,
+					called_station_id => $called_station_id, 
+					ssid => $ssid, 
+					calling_station_id => $calling_station_id, 
+					subscriber_id => $username_nq, 
+					session_id => $qacctsessionid, 
+					session_time => $session_time, 
+					input_octets => $input_octets, 
+					output_octets => $output_octets, 
+					framed_ip_addr => $framed_ip_addr, 
+					nas_ip_addr => $nas_ip_addr, 
+					timestamp => time, 
+				};
+				
+				my $job_json = &Radius::Util::encode_json($job);
+				# PUSH REDIS ACCOUNTING JOB 
+				$r->rpush('radiator:jobs:accounting', $job_json);
+				$r->quit;
+			}
+		};
+		if ($@) {
+			$self->log($main::LOG_ERROR, "[Redis] Failed to push ap accounting for csid $called_station_id: $@");
+		}
 
 		# Execute the insert, and if it fails, log the accounting
 		# record to a file
