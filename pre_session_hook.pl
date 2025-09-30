@@ -19,7 +19,7 @@ sub {
     eval {
         if ($reqcode eq 'Accounting-Request') {
             $session_id = $p->get_attr('Acct-Session-Id');
-            $dbh = DBI->connect("dbi:Pg:dbname=radius;host=192.168.61.22;port=5433", "radiator", "ap0ll0z33P", { RaiseError => 1, AutoCommit => 1 });
+            $dbh = DBI->connect("dbi:Pg:dbname=radius;host=192.168.61.37;port=5433", "radiator", "z33PRad!aT0r", { RaiseError => 1, AutoCommit => 1 });
             $sth = $dbh->prepare(q{
                 SELECT acctinputoctets, acctoutputoctets, acctsessiontime FROM accounting WHERE acctsessionid=?
             });
@@ -40,7 +40,7 @@ sub {
     my $redis;
     eval {
         $redis = Redis->new(
-            server        => '192.168.61.23:6379',
+            server        => '192.168.61.38:6379',
             reconnect     => 10,
             every         => 10000,
             cnx_timeout   => 5,
