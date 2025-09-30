@@ -16,7 +16,7 @@ REDIS_URL = os.getenv("REDIS_URL")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 KAFKA_URL = os.getenv("KAFKA_URL")
 KAFKA_CLIENT_ID = os.getenv("KAFKA_CLIENT_ID")
-KAFKA_TIMEOUT = int(os.getenv("KAFKA_TIMEOUT", "30"))
+KAFKA_TIMEOUT = int(os.getenv("KAFKA_TIMEOUT", "10"))
 
 logging.basicConfig(
     level=logging.INFO,

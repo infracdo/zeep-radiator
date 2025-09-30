@@ -592,7 +592,7 @@ sub handle_accounting
 				
 				my $job_json = &Radius::Util::encode_json($job);
 				# PUSH REDIS ACCOUNTING JOB 
-				$r->rpush('radiator.jobs.accounting', $job_json);
+				$r->rpush('radiator_jobs_accounting', $job_json);
 				$r->quit;
 			}
 		};

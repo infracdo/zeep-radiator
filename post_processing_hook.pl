@@ -68,8 +68,8 @@ sub
     my $job_json = encode_json($job);
     
     eval {
-        &main::log($main::LOG_DEBUG, "[json] radiator:jobs:login, $job_json");
-        $redis->rpush('radiator.jobs.login', $job_json);
+        &main::log($main::LOG_DEBUG, "[json] radiator_jobs_login, $job_json");
+        $redis->rpush('radiator_jobs_login', $job_json);
     };
     if ($@) {
         &main::log($main::LOG_WARNING, "Failed to push job to Redis: $@");
